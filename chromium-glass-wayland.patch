@@ -1,0 +1,75 @@
+diff --git a/ui/base/ui_base_features.cc b/ui/base/ui_base_features.cc
+--- a/ui/base/ui_base_features.cc
++++ b/ui/base/ui_base_features.cc
+@@ -506,6 +506,8 @@ bool IsGlassFrameEnabled() {
+ #if BUILDFLAG(IS_MAC)
+   return base::mac::MacOSMajorVersion() >= 26 &&
+          base::FeatureList::IsEnabled(kGlassFrame);
++#elif BUILDFLAG(IS_LINUX)
++  return base::FeatureList::IsEnabled(kGlassFrame);
+ #else
+   return false;
+ #endif
+diff --git a/chrome/browser/ui/color/chrome_color_mixers.cc b/chrome/browser/ui/color/chrome_color_mixers.cc
+--- a/chrome/browser/ui/color/chrome_color_mixers.cc
++++ b/chrome/browser/ui/color/chrome_color_mixers.cc
+@@ -23,6 +23,12 @@
+ #include "chrome/browser/ui/color/product_specifications_color_mixer.h"
+ #include "chrome/browser/ui/color/projects_panel_color_mixer.h"
+ #include "chrome/browser/ui/color/tab_strip_color_mixer.h"
++#include "third_party/skia/include/core/SkColor.h"
++#include "ui/base/ui_base_features.h"
++#include "ui/color/color_id.h"
++#include "ui/color/color_mixer.h"
++#include "ui/color/color_provider.h"
++#include "ui/color/color_recipe.h"
+ #include "ui/color/color_provider_utils.h"
+ 
+ namespace {
+@@ -48,6 +54,46 @@ bool ChromeColorProviderUtilsCallbacks::ColorIdName(
+   return false;
+ }
+ 
++void AddGlassColorMixer(ui::ColorProvider* provider) {
++  if (!features::IsGlassFrameEnabled()) {
++    return;
++  }
++
++  // This mixer intentionally runs after Material, native, custom-theme, and
++  // app-controller mixers so their opaque recipes cannot flatten GlassFrame.
++  ui::ColorMixer& mixer = provider->AddMixer();
++  constexpr SkColor kGlassChrome =
++      SkColorSetARGB(0x9A, 0x1A, 0x1C, 0x20);
++  constexpr SkColor kGlassPanel =
++      SkColorSetARGB(0xB8, 0x1C, 0x1E, 0x22);
++  constexpr SkColor kGlassPopup =
++      SkColorSetARGB(0xCC, 0x20, 0x22, 0x26);
++
++  mixer[ui::kColorFrameActive] = {kGlassChrome};
++  mixer[ui::kColorFrameInactive] = {kGlassChrome};
++  mixer[kColorTabBackgroundInactiveFrameActive] = {kGlassChrome};
++  mixer[kColorTabBackgroundInactiveFrameInactive] = {kGlassChrome};
++  mixer[kColorTabBackgroundActiveFrameActive] = {kGlassChrome};
++  mixer[kColorTabBackgroundActiveFrameInactive] = {kGlassChrome};
++  mixer[kColorToolbar] = {kGlassChrome};
++  mixer[kColorBookmarkBarBackground] = {kGlassChrome};
++  mixer[kColorToolbarBackgroundSubtleEmphasis] = {kGlassChrome};
++  mixer[kColorToolbarBackgroundSubtleEmphasisHovered] = {kGlassChrome};
++  mixer[kColorLocationBarBackground] = {kGlassChrome};
++  mixer[kColorLocationBarBackgroundHovered] = {kGlassChrome};
++  mixer[kColorSidePanelContentBackground] = {kGlassPanel};
++  mixer[kColorSidePanelDialogBackground] = {kGlassPopup};
++  mixer[ui::kColorBubbleBackground] = {kGlassPopup};
++  mixer[ui::kColorMenuBackground] = {kGlassPopup};
++}
++
+ // Note that this second include is not redundant. The second inclusion of the
+ // .inc file serves to undefine the macros the first inclusion defined.
+ #include "ui/color/color_id_map_macros.inc"
+@@ -83,4 +129,6 @@ void AddChromeColorMixers(ui::ColorProvider* provider,
+   if (key.app_controller) {
+     key.app_controller->AddColorMixers(provider, key);
+   }
++
++  AddGlassColorMixer(provider);
+ }

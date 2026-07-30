@@ -1,0 +1,12 @@
+*.pkg.tar.*
+*.tar.xz
+*.tar.gz
+pkg/
+src/
+chromium-checkout/
+chromium-[0-9]*.patch
+compiler-rt-adjust-paths.patch
+enable-widevine-arm64.patch
+glibc-*.patch
+increase-fortify-level.patch
+use-oauth2-client-switches-as-default.patch
