@@ -1,7 +1,7 @@
 pkgbase = chromium-glass
 	pkgdesc = Chromium with native translucent browser chrome for Wayland compositors
 	pkgver = 150.0.7871.186
-	pkgrel = 2
+	pkgrel = 11
 	url = https://www.chromium.org/Home
 	arch = x86_64
 	license = BSD-3-Clause
@@ -116,6 +116,6 @@ pkgbase = chromium-glass
 	sha256sums = 33d1650e183a86cc2d0e9b0fcc08a5da76c7354d25a419921e9d2dc02b8b3854
 	sha256sums = 9343afa1a4308a7cfb3317229f5aff7778688debcc03c4a74a85908aa1d0cc3a
 	sha256sums = 1c1898f263eaacbc069a8e1a3e732852350350d1dad4cb1a6bba430e3b796cd0
-	sha256sums = 63a323a01637453fac7d01c2eda4966b18b1f4344cb8b8281be62122bfd8c6fb
+	sha256sums = 3b2adeb4cd994c0b0037f9111589ec1dfb3efb019bccce87212a966ad2ff89ed
 
 pkgname = chromium-glass

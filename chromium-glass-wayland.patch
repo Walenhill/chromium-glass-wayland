@@ -1,7 +1,6 @@
-diff --git a/ui/base/ui_base_features.cc b/ui/base/ui_base_features.cc
 --- a/ui/base/ui_base_features.cc
 +++ b/ui/base/ui_base_features.cc
-@@ -506,6 +506,8 @@ bool IsGlassFrameEnabled() {
+@@ -506,6 +506,8 @@
  #if BUILDFLAG(IS_MAC)
    return base::mac::MacOSMajorVersion() >= 26 &&
           base::FeatureList::IsEnabled(kGlassFrame);
@@ -10,7 +9,6 @@ diff --git a/ui/base/ui_base_features.cc b/ui/base/ui_base_features.cc
  #else
    return false;
  #endif
-diff --git a/chrome/browser/ui/color/chrome_color_mixers.cc b/chrome/browser/ui/color/chrome_color_mixers.cc
 --- a/chrome/browser/ui/color/chrome_color_mixers.cc
 +++ b/chrome/browser/ui/color/chrome_color_mixers.cc
 @@ -23,6 +23,12 @@
@@ -24,12 +22,12 @@ diff --git a/chrome/browser/ui/color/chrome_color_mixers.cc b/chrome/browser/ui/
 +#include "ui/color/color_provider.h"
 +#include "ui/color/color_recipe.h"
  #include "ui/color/color_provider_utils.h"
- 
+
  namespace {
-@@ -48,6 +54,46 @@ bool ChromeColorProviderUtilsCallbacks::ColorIdName(
+@@ -48,6 +54,84 @@
    return false;
  }
- 
+
 +void AddGlassColorMixer(ui::ColorProvider* provider) {
 +  if (!features::IsGlassFrameEnabled()) {
 +    return;
@@ -38,38 +36,398 @@ diff --git a/chrome/browser/ui/color/chrome_color_mixers.cc b/chrome/browser/ui/
 +  // This mixer intentionally runs after Material, native, custom-theme, and
 +  // app-controller mixers so their opaque recipes cannot flatten GlassFrame.
 +  ui::ColorMixer& mixer = provider->AddMixer();
-+  constexpr SkColor kGlassChrome =
++  constexpr SkColor kGlassBase =
 +      SkColorSetARGB(0x9A, 0x1A, 0x1C, 0x20);
++  constexpr SkColor kGlassActiveTab =
++      SkColorSetARGB(0x24, 0xFF, 0xFF, 0xFF);
++  constexpr SkColor kGlassTabHover =
++      SkColorSetARGB(0x12, 0xFF, 0xFF, 0xFF);
++  constexpr SkColor kGlassOmnibox =
++      SkColorSetARGB(0x48, 0x10, 0x12, 0x16);
++  constexpr SkColor kGlassOmniboxHovered =
++      SkColorSetARGB(0x58, 0x10, 0x12, 0x16);
++  constexpr SkColor kGlassOmniboxResultHover =
++      SkColorSetARGB(0x18, 0xFF, 0xFF, 0xFF);
 +  constexpr SkColor kGlassPanel =
 +      SkColorSetARGB(0xB8, 0x1C, 0x1E, 0x22);
 +  constexpr SkColor kGlassPopup =
 +      SkColorSetARGB(0xCC, 0x20, 0x22, 0x26);
++  constexpr SkColor kGlassMenu =
++      SkColorSetARGB(0x92, 0x20, 0x22, 0x26);
 +
-+  mixer[ui::kColorFrameActive] = {kGlassChrome};
-+  mixer[ui::kColorFrameInactive] = {kGlassChrome};
-+  mixer[kColorTabBackgroundInactiveFrameActive] = {kGlassChrome};
-+  mixer[kColorTabBackgroundInactiveFrameInactive] = {kGlassChrome};
-+  mixer[kColorTabBackgroundActiveFrameActive] = {kGlassChrome};
-+  mixer[kColorTabBackgroundActiveFrameInactive] = {kGlassChrome};
-+  mixer[kColorToolbar] = {kGlassChrome};
-+  mixer[kColorBookmarkBarBackground] = {kGlassChrome};
-+  mixer[kColorToolbarBackgroundSubtleEmphasis] = {kGlassChrome};
-+  mixer[kColorToolbarBackgroundSubtleEmphasisHovered] = {kGlassChrome};
-+  mixer[kColorLocationBarBackground] = {kGlassChrome};
-+  mixer[kColorLocationBarBackgroundHovered] = {kGlassChrome};
++  // Frame and toolbar are the only full glass surfaces. Child controls below
++  // use lightweight overlays so their alpha does not stack into dark blocks.
++  mixer[ui::kColorFrameActive] = {kGlassBase};
++  mixer[ui::kColorFrameInactive] = {kGlassBase};
++  mixer[kColorToolbar] = {kGlassBase};
++  mixer[kColorBookmarkBarBackground] = {SK_ColorTRANSPARENT};
++
++  mixer[kColorTabBackgroundInactiveFrameActive] = {SK_ColorTRANSPARENT};
++  mixer[kColorTabBackgroundInactiveFrameInactive] = {SK_ColorTRANSPARENT};
++  mixer[kColorTabBackgroundInactiveHoverFrameActive] = {kGlassTabHover};
++  mixer[kColorTabBackgroundInactiveHoverFrameInactive] = {kGlassTabHover};
++  mixer[kColorTabBackgroundSelectedFrameActive] = {kGlassTabHover};
++  mixer[kColorTabBackgroundSelectedFrameInactive] = {kGlassTabHover};
++  mixer[kColorTabBackgroundSelectedHoverFrameActive] = {kGlassActiveTab};
++  mixer[kColorTabBackgroundSelectedHoverFrameInactive] = {kGlassActiveTab};
++  mixer[kColorTabBackgroundActiveFrameActive] = {kGlassActiveTab};
++  mixer[kColorTabBackgroundActiveFrameInactive] = {kGlassActiveTab};
++  mixer[kColorTabStrokeFrameActive] = {SK_ColorTRANSPARENT};
++  mixer[kColorTabStrokeFrameInactive] = {SK_ColorTRANSPARENT};
++  mixer[kColorToolbarTopSeparatorFrameActive] = {SK_ColorTRANSPARENT};
++  mixer[kColorToolbarTopSeparatorFrameInactive] = {SK_ColorTRANSPARENT};
++
++  mixer[kColorNewTabButtonBackgroundFrameActive] = {SK_ColorTRANSPARENT};
++  mixer[kColorNewTabButtonBackgroundFrameInactive] = {SK_ColorTRANSPARENT};
++  mixer[kColorNewTabButtonCRBackgroundFrameActive] = {SK_ColorTRANSPARENT};
++  mixer[kColorNewTabButtonCRBackgroundFrameInactive] = {
++      SK_ColorTRANSPARENT};
++  mixer[kColorTabSearchButtonBackground] = {SK_ColorTRANSPARENT};
++  mixer[kColorTabSearchButtonIconBackground] = {SK_ColorTRANSPARENT};
++
++  mixer[kColorToolbarBackgroundSubtleEmphasis] = {kGlassOmnibox};
++  mixer[kColorToolbarBackgroundSubtleEmphasisHovered] = {
++      kGlassOmniboxHovered};
++  mixer[kColorLocationBarBackground] = {kGlassOmnibox};
++  mixer[kColorLocationBarBackgroundHovered] = {kGlassOmniboxHovered};
++  mixer[kColorOmniboxResultsBackground] = {kGlassOmnibox};
++  mixer[kColorOmniboxResultsBackgroundHovered] = {
++      kGlassOmniboxResultHover};
++  mixer[kColorOmniboxResultsBackgroundHoverOverlay] = {
++      kGlassOmniboxResultHover};
++  mixer[kColorOmniboxResultsBackgroundSelected] = {
++      kGlassOmniboxResultHover};
++
 +  mixer[kColorSidePanelContentBackground] = {kGlassPanel};
 +  mixer[kColorSidePanelDialogBackground] = {kGlassPopup};
 +  mixer[ui::kColorBubbleBackground] = {kGlassPopup};
-+  mixer[ui::kColorMenuBackground] = {kGlassPopup};
++  mixer[ui::kColorMenuBackground] = {kGlassMenu};
++  mixer[kColorExtensionDialogBackground] = {kGlassPopup};
++  mixer[kColorExtensionsMenuContainerBackground] = {SK_ColorTRANSPARENT};
 +}
 +
  // Note that this second include is not redundant. The second inclusion of the
  // .inc file serves to undefine the macros the first inclusion defined.
  #include "ui/color/color_id_map_macros.inc"
-@@ -83,4 +129,6 @@ void AddChromeColorMixers(ui::ColorProvider* provider,
+@@ -83,4 +165,6 @@
    if (key.app_controller) {
      key.app_controller->AddColorMixers(provider, key);
    }
 +
 +  AddGlassColorMixer(provider);
  }
+--- a/chrome/browser/ui/views/tabs/tab_group_underline.cc
++++ b/chrome/browser/ui/views/tabs/tab_group_underline.cc
+@@ -87,9 +87,11 @@
+   const Tab* const tab = views::AsViewClass<Tab>(sibling_view);
+   DCHECK(tab);
+
+-  // Active tabs need the rounded bits of the underline poking out the sides.
++  // GlassFrame keeps the group underline inside the active tab. Extending it
++  // beyond the rounded tab corners creates bright hooks against translucent
++  // toolbar surfaces.
+   if (tab->IsActive()) {
+-    return gfx::Insets::TLBR(0, -kStrokeThickness, 0, -kStrokeThickness);
++    return gfx::Insets::TLBR(0, GetStrokeInset(), 0, GetStrokeInset());
+   }
+
+   // Inactive tabs are inset like group headers.
+--- a/chrome/browser/ui/views/tabs/tab_style_views.cc
++++ b/chrome/browser/ui/views/tabs/tab_style_views.cc
+@@ -943,6 +943,12 @@
+   DCHECK(!y_inset || fill_id.has_value());
+
+   std::optional<SkColor> group_color = tab_->GetGroupColor();
++  if (features::IsGlassFrameEnabled()) {
++    // A grouped active tab normally paints a full group-colored border. Most
++    // of that border is hidden by the toolbar, leaving two bright end points
++    // on a translucent frame. The group underline remains as its indicator.
++    group_color.reset();
++  }
+
+   PaintTabBackgroundFill(canvas, selection_state, hovered, fill_id, y_inset);
+
+--- a/chrome/browser/ui/views/omnibox/omnibox_popup_webui_base_content.cc
++++ b/chrome/browser/ui/views/omnibox/omnibox_popup_webui_base_content.cc
+@@ -34,7 +34,9 @@
+ #include "content/public/browser/render_widget_host.h"
+ #include "content/public/browser/render_widget_host_view.h"
+ #include "content/public/browser/web_contents.h"
++#include "third_party/skia/include/core/SkColor.h"
+ #include "third_party/blink/public/common/input/web_mouse_event.h"
++#include "ui/base/ui_base_features.h"
+ #include "ui/base/metadata/metadata_impl_macros.h"
+ #include "ui/base/mojom/menu_source_type.mojom.h"
+ #include "ui/gfx/geometry/rounded_corners_f.h"
+@@ -159,6 +161,16 @@
+         base::StrCat({GetMetricPrefix(), ".CrashRecovery"}), false);
+   }
+   SetWebContents(contents_wrapper_->web_contents());
++  if (features::IsGlassFrameEnabled()) {
++    // The popup Widget is translucent, but the embedded renderer otherwise
++    // clears its surface to an opaque page color before painting WebUI. Keep
++    // that base transparent so the compositor can blur content behind it.
++    GetWrappedWebContents()->SetPageBaseBackgroundColor(SK_ColorTRANSPARENT);
++    if (auto* render_widget_host_view =
++            GetWrappedWebContents()->GetRenderWidgetHostView()) {
++      render_widget_host_view->SetBackgroundColor(SK_ColorTRANSPARENT);
++    }
++  }
+
+   // The View may have changed, so this reinstates auto-resizing to prevent
+   // the omnibox from staying collapsed until a resize is observed.
+--- a/chrome/browser/ui/views/location_bar/location_bar_view.cc
++++ b/chrome/browser/ui/views/location_bar/location_bar_view.cc
+@@ -1614,9 +1614,13 @@
+         /*antialias=*/true, /*should_border_scale=*/true));
+   }
+
+-  // Keep the views::Textfield in sync. It needs an opaque background to
+-  // correctly enable subpixel AA.
+-  omnibox_view_->SetBackgroundColor(background_color_);
++  // Keep the views::Textfield in sync. It normally needs an opaque background
++  // to enable subpixel AA. GlassFrame cannot use the same translucent color
++  // here because it would be composited a second time over the rounded
++  // LocationBar background, making the center visibly darker than its ends.
++  omnibox_view_->SetBackgroundColor(features::IsGlassFrameEnabled()
++                                        ? SK_ColorTRANSPARENT
++                                        : background_color_);
+
+   // The divider between indicators and request chips should have the same color
+   // as the omnibox.
+--- a/chrome/browser/ui/views/omnibox/omnibox_popup_presenter_base.cc
++++ b/chrome/browser/ui/views/omnibox/omnibox_popup_presenter_base.cc
+@@ -25,12 +25,20 @@
+ #include "components/omnibox/common/omnibox_features.h"
+ #include "components/omnibox/common/omnibox_metrics_utils.h"
+ #include "content/public/browser/render_frame_host.h"
++#include "third_party/skia/include/core/SkColor.h"
++#include "ui/base/ui_base_features.h"
+ #include "ui/compositor/compositor.h"
++#include "ui/compositor/layer.h"
+ #include "ui/views/metadata/view_factory.h"
++#include "ui/views/layout/layout_provider.h"
+ #include "ui/views/view_class_properties.h"
+ #include "ui/views/view_utils.h"
+ #include "ui/views/widget/native_widget.h"
+
++#if defined(USE_AURA)
++#include "ui/aura/window.h"
++#endif
++
+ namespace omnibox {
+ const void* kOmniboxWebUIPopupWidgetId = &kOmniboxWebUIPopupWidgetId;
+ }
+@@ -131,6 +139,9 @@
+ }
+
+ void OmniboxPopupPresenterBase::ShowWidget(base::TimeTicks show_request_time) {
++  if (glass_blur_backdrop_) {
++    glass_blur_backdrop_->SetVisible(true);
++  }
+   widget_->ShowInactive();
+   // If the derived class requests hiding for the initial layout pass, make the
+   // widget transparent until we receive a valid content height.
+@@ -208,6 +219,9 @@
+
+ void OmniboxPopupPresenterBase::Hide() {
+   is_deferred_ = false;
++  if (glass_blur_backdrop_) {
++    glass_blur_backdrop_->SetVisible(false);
++  }
+   // Only close if UI DevTools settings allow.
+   if (widget_ && widget_->ShouldHandleNativeWidgetActivationChanged(false)) {
+     widget_->Hide();
+@@ -297,6 +311,15 @@
+       widget_bounds.Inset(-RoundedOmniboxResultsFrame::GetShadowInsets());
+     }
+     widget_->SetBounds(widget_bounds);
++    if (glass_blur_backdrop_) {
++      gfx::Rect backdrop_bounds = widget_bounds;
++      const gfx::Point parent_origin =
++          presenter_delegate_->GetLocationBarWidget()
++              ->GetWindowBoundsInScreen()
++              .origin();
++      backdrop_bounds.Offset(-parent_origin.x(), -parent_origin.y());
++      glass_blur_backdrop_->SetBounds(backdrop_bounds);
++    }
+   }
+ }
+
+@@ -351,6 +374,28 @@
+       &OmniboxPopupPresenterBase::OnWidgetClosed, base::Unretained(this)));
+
+   widget_->Init(std::move(params));
++#if defined(USE_AURA)
++  if (features::IsGlassFrameEnabled()) {
++    // The popup has its own compositor, so filters inside it cannot sample the
++    // parent page. Put a matching blur layer in the browser compositor; the
++    // transparent popup surface then reveals this blurred parent region.
++    glass_blur_backdrop_ =
++        std::make_unique<ui::Layer>(ui::LAYER_SOLID_COLOR);
++    glass_blur_backdrop_->SetName("GlassFrame/OmniboxPopupBackdrop");
++    glass_blur_backdrop_->SetColor(SkColorSetARGB(1, 0, 0, 0));
++    glass_blur_backdrop_->SetFillsBoundsOpaquely(false);
++    glass_blur_backdrop_->SetBackgroundBlur(18.0f);
++    glass_blur_backdrop_->SetBackdropFilterQuality(0.5f);
++    glass_blur_backdrop_->SetRoundedCornerRadius(gfx::RoundedCornersF(
++        views::LayoutProvider::Get()->GetCornerRadiusMetric(
++            views::ShapeContextTokens::kOmniboxExpandedRadius)));
++    glass_blur_backdrop_->SetIsFastRoundedCorner(true);
++    glass_blur_backdrop_->SetAcceptEvents(false);
++    glass_blur_backdrop_->SetVisible(false);
++    parent_widget->GetNativeWindow()->layer()->Add(
++        glass_blur_backdrop_.get());
++  }
++#endif
+   widget_->SetNativeWindowProperty(
+       views::kWidgetIdentifierKey,
+       const_cast<void*>(omnibox::kOmniboxWebUIPopupWidgetId));
+@@ -389,6 +434,7 @@
+   // that subclasses can safely access the widget (e.g., to reset observations)
+   // before it is destroyed, avoiding dangling pointer issues.
+   WidgetDestroyed();
++  glass_blur_backdrop_.reset();
+   widget_.reset();
+ }
+
+--- a/chrome/browser/ui/views/omnibox/omnibox_popup_presenter_base.h
++++ b/chrome/browser/ui/views/omnibox/omnibox_popup_presenter_base.h
+@@ -32,6 +32,10 @@
+ class WebContents;
+ }  // namespace content
+
++namespace ui {
++class Layer;
++}  // namespace ui
++
+ namespace omnibox {
+ extern const void* kOmniboxWebUIPopupWidgetId;
+ }  // namespace omnibox
+@@ -194,6 +198,10 @@
+   // owned and destroyed by the OS.
+   std::unique_ptr<views::Widget> widget_;
+
++  // Lives in the parent browser compositor directly below the transparent
++  // popup Widget, where the page contents are available as a real backdrop.
++  std::unique_ptr<ui::Layer> glass_blur_backdrop_;
++
+   const raw_ptr<OmniboxController> controller_;
+
+   // True if `ShowWidget()` execution is currently being deferred until the
+--- a/ui/views/bubble/bubble_dialog_delegate_view.cc
++++ b/ui/views/bubble/bubble_dialog_delegate_view.cc
+@@ -644,6 +644,14 @@
+   client_view->layer()->SetRoundedCornerRadius(
+       gfx::RoundedCornersF(GetCornerRadius()));
+   client_view->layer()->SetIsFastRoundedCorner(true);
++  if (::features::IsGlassFrameEnabled()) {
++    // On Linux these bubbles are Aura children inside the browser compositor,
++    // not independent Wayland surfaces. Apply the backdrop blur here because
++    // an external compositor cannot target them separately.
++    client_view->layer()->SetFillsBoundsOpaquely(false);
++    client_view->layer()->SetBackgroundBlur(18.0f);
++    client_view->layer()->SetBackdropFilterQuality(0.5f);
++  }
+
+   return client_view;
+ }
+--- a/ui/views/controls/menu/menu_scroll_view_container.cc
++++ b/ui/views/controls/menu/menu_scroll_view_container.cc
+@@ -22,6 +22,7 @@
+ #include "ui/base/dragdrop/mojom/drag_drop_types.mojom.h"
+ #include "ui/base/metadata/metadata_header_macros.h"
+ #include "ui/base/metadata/metadata_impl_macros.h"
++#include "ui/base/ui_base_features.h"
+ #include "ui/color/color_id.h"
+ #include "ui/color/color_provider.h"
+ #include "ui/color/color_variant.h"
+@@ -247,8 +248,9 @@
+                                     ->use_ash_system_ui_layout()) {
+   SetUseDefaultFillLayout(true);
+   background_view_ = AddChildView(std::make_unique<View>());
+-  if (use_ash_system_ui_layout_) {
+-    // Enable background blur for ChromeOS system context menu.
++  if (use_ash_system_ui_layout_ || ::features::IsGlassFrameEnabled()) {
++    // Enable background blur for ChromeOS system context menus and for
++    // GlassFrame menus composited as Aura children on Linux.
+     background_view_->SetPaintToLayer();
+     auto* background_layer = background_view_->layer();
+     background_layer->SetName("MenuScrollViewContainer/background");
+--- a/chrome/browser/ui/views/omnibox/omnibox_popup_view_views.cc
++++ b/chrome/browser/ui/views/omnibox/omnibox_popup_view_views.cc
+@@ -40,5 +40,6 @@
+ #include "ui/accessibility/ax_node_data.h"
+ #include "ui/base/metadata/metadata_impl_macros.h"
++#include "ui/base/ui_base_features.h"
+ #include "ui/compositor/closure_animation_observer.h"
+ #include "ui/compositor/layer.h"
+ #include "ui/compositor/scoped_layer_animation_settings.h"
+@@ -47,5 +48,6 @@
+ #include "ui/views/cascading_property.h"
+ #include "ui/views/layout/box_layout.h"
+ #include "ui/views/property_effects.h"
++#include "ui/views/widget/desktop_aura/desktop_native_widget_aura.h"
+ #include "ui/views/widget/widget.h"
+
+ namespace {
+@@ -118,6 +120,16 @@
+     views::Widget::InitParams params(
+         views::Widget::InitParams::NATIVE_WIDGET_OWNS_WIDGET,
+         views::Widget::InitParams::TYPE_POPUP);
++#if defined(USE_AURA)
++    if (features::IsGlassFrameEnabled()) {
++      // A child Aura popup shares the browser's Wayland surface. Use a native
++      // MENU host so Ozone creates a real xdg_popup that the compositor can
++      // blur independently.
++      params.type = views::Widget::InitParams::TYPE_MENU;
++      params.native_widget = new views::DesktopNativeWidgetAura(this);
++    }
++#endif
+ #if BUILDFLAG(IS_WIN)
+     // On Windows use the software compositor to ensure that we don't block
+     // the UI thread during command buffer creation. We can revert this change
+--- a/ui/views/controls/menu/menu_scroll_view_container.cc
++++ b/ui/views/controls/menu/menu_scroll_view_container.cc
+@@ -348,8 +350,11 @@
+     return;
+   }
+
+-  // ChromeOS system UI menu uses 'background_view_' to paint background.
+-  if (use_ash_system_ui_layout_ && background_view_->background()) {
++  // ChromeOS system UI and GlassFrame menus use `background_view_` as their
++  // single visible surface. Painting the container as well would stack two
++  // translucent fills and nearly hide the backdrop blur.
++  if ((use_ash_system_ui_layout_ || ::features::IsGlassFrameEnabled()) &&
++      background_view_->background()) {
+     return;
+   }
+
+@@ -483,6 +488,12 @@
+     shadow_type = BubbleBorder::CHROMEOS_SYSTEM_UI_SHADOW;
+   }
+ #endif
++  if (::features::IsGlassFrameEnabled()) {
++    // The Wayland compositor already supplies the popup shadow. Keeping the
++    // Chromium nine-patch shadow as well creates differently tinted bands
++    // above and below the translucent menu surface.
++    shadow_type = BubbleBorder::NO_SHADOW;
++  }
+   id = border_color_id_.value_or(id);
+
+   auto bubble_border = std::make_unique<BubbleBorder>(arrow_, shadow_type);
+@@ -528,10 +539,10 @@
+
+   background_rounded_corners_ = bubble_border->rounded_corners();
+
+-  // If the menu uses Ash system UI layout, use `background_view` to build a
+-  // blurry background with highlight border. Otherwise, use default
+-  // BubbleBackground.
+-  if (use_ash_system_ui_layout_) {
++  // Ash system UI and GlassFrame use `background_view_` for the visible
++  // surface. This keeps blur, tint, and rounded clipping on one layer instead
++  // of stacking another BubbleBackground over it.
++  if (use_ash_system_ui_layout_ || ::features::IsGlassFrameEnabled()) {
+     // The bubble border only draws the shadow, while the background view draws
+     // the visible border, so the insets must be inside the background view's
+     // content, not outside the background view.

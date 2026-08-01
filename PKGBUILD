@@ -8,7 +8,7 @@
 
 pkgname=chromium-glass
 pkgver=150.0.7871.186
-pkgrel=2
+pkgrel=11
 _launcher_ver=8
 _arch_pkg_tag=150.0.7871.186-1
 _arch_pkg_base="https://gitlab.archlinux.org/archlinux/packaging/packages/chromium/-/raw/$_arch_pkg_tag"
@@ -118,7 +118,7 @@ sha256sums=('4ff4b64971c8097631a4f17d2f7fb050e8ede62b1b3c0f1ef0a1fffcac11bbb7'
             '33d1650e183a86cc2d0e9b0fcc08a5da76c7354d25a419921e9d2dc02b8b3854'
             '9343afa1a4308a7cfb3317229f5aff7778688debcc03c4a74a85908aa1d0cc3a'
             '1c1898f263eaacbc069a8e1a3e732852350350d1dad4cb1a6bba430e3b796cd0'
-            '63a323a01637453fac7d01c2eda4966b18b1f4344cb8b8281be62122bfd8c6fb')
+            '3b2adeb4cd994c0b0037f9111589ec1dfb3efb019bccce87212a966ad2ff89ed')
 
 if (( _manual_clone )); then
   source[0]=fetch-chromium-release
