@@ -5,6 +5,16 @@ The patch enables Chromium's existing `GlassFrame` path on Linux and assigns
 semi-transparent colors to the tab strip, toolbar, omnibox, panels, and menus
 so a Wayland compositor can blur the content behind the window.
 
+## Screenshots
+
+![Chromium Glass overview](screenshots/chromium-glass-overview.png)
+
+![Blurred omnibox suggestions](screenshots/chromium-glass-omnibox-popup.png)
+
+| Main menu | Context menu |
+| --- | --- |
+| ![Translucent Chromium main menu](screenshots/chromium-glass-main-menu.png) | ![Blurred Chromium context menu](screenshots/chromium-glass-context-menu.png) |
+
 The package launches Chromium with:
 
 ```text
