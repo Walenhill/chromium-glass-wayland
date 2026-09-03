@@ -36,7 +36,9 @@ jobs:
 
       - name: Set up Swap (12 GB)
         run: |
-          sudo fallocate -l 12G /swapfile
+          sudo swapoff -a || true
+          sudo rm -f /swapfile
+          sudo fallocate -l 12G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=12288
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon /swapfile
@@ -62,7 +64,8 @@ jobs:
               echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
               chown -R builder:builder /build
               
-              # Build package without tests
+              # Configure git safe directory and build package
+              su builder -c 'git config --global --add safe.directory \"*\"'
               su builder -c 'makepkg --noconfirm -s --needed'
             "
 
