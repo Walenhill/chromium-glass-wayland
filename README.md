@@ -78,5 +78,5 @@ The exact rule syntax can vary between Hyprland configuration frameworks.
 
 - This is an unofficial Chromium build.
 - Rebuild promptly when Arch updates Chromium, especially for security fixes.
-- The package is currently based on Chromium `150.0.7871.186`.
+- The package is currently based on Chromium `151.0.7922.108`.
 - The packaging base comes from the official Arch Linux Chromium package.
