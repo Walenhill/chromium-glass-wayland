@@ -1,95 +1,99 @@
 name: Build Chromium Glass
 
 on:
+  pull_request:
   push:
-    tags:
-      - 'v*'
+    branches: ['codex/auto-update']
+    tags: ['v*']
   workflow_dispatch:
     inputs:
-      create_release:
-        description: 'Publish as GitHub Release'
+      compile:
+        description: 'Run the full Chromium build (may take several hours)'
         type: boolean
         default: false
+      runner:
+        description: 'Runner label (ubuntu-latest or a configured build runner)'
+        type: string
+        default: ubuntu-latest
+
+permissions:
+  contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: glass-build-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  build:
-    name: Build Arch Linux Package
+  compatibility:
     runs-on: ubuntu-latest
-    timeout-minutes: 360
-
     steps:
-      - name: Free Disk Space
+      - uses: actions/checkout@v4
+      - name: Validate recipe and complete Glass integration
         run: |
-          echo "=== Disk space before cleanup ==="
-          df -h
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo docker image prune --all --force 2>/dev/null || true
-          echo "=== Disk space after cleanup ==="
-          df -h
+          bash -n PKGBUILD tools/build_in_container.sh tools/install_updater.sh
+          python3 -m unittest discover -s tests -v
+          python3 tools/check_compatibility.py "$(python3 -c 'import json; print(json.load(open("upstream.json"))["version"])')" --report compatibility.json
+          python3 tools/validate_metadata.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: compatibility-report
+          path: compatibility.json
 
-      - name: Set up Swap (12 GB)
+  build:
+    needs: compatibility
+    if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.compile)
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    timeout-minutes: 360
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check build resources
         run: |
-          sudo swapoff -a || true
-          sudo rm -f /swapfile
-          sudo fallocate -l 12G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=12288
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
+          df -h .
           free -h
-
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Build Package in Arch Linux Container
+          test "$(df -Pk . | awk 'NR==2 {print $4}')" -ge 83886080 || { echo 'Need at least 80 GiB free for a full build'; exit 1; }
+      - name: Add dedicated swap on hosted runner
+        if: (inputs.runner || 'ubuntu-latest') == 'ubuntu-latest'
         run: |
+          sudo fallocate -l 12G /mnt/chromium-glass.swap
+          sudo chmod 600 /mnt/chromium-glass.swap
+          sudo mkswap /mnt/chromium-glass.swap
+          sudo swapon /mnt/chromium-glass.swap
+      - uses: actions/cache@v4
+        with:
+          path: .sccache
+          key: sccache-${{ runner.os }}-${{ hashFiles('PKGBUILD') }}-${{ github.run_id }}
+          restore-keys: |
+            sccache-${{ runner.os }}-${{ hashFiles('PKGBUILD') }}-
+            sccache-${{ runner.os }}-
+      - name: Build and smoke-test in clean Arch container
+        run: |
+          mkdir -p .sccache artifacts
           docker run --rm \
-            -v "${GITHUB_WORKSPACE}:/build" \
-            -w /build \
-            archlinux:base-devel bash -c "
-              set -euo pipefail
-              
-              # Update keyring and package databases
-              pacman -Sy --noconfirm archlinux-keyring
-              pacman -Syu --noconfirm --needed git sudo
-              
-              # Set up non-root builder user
-              useradd -m -G wheel builder
-              echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
-              chown -R builder:builder /build
-              
-              # Configure git safe directory and build package
-              su builder -c 'git config --global --add safe.directory \"*\"'
-              su builder -c 'makepkg --noconfirm -s --needed'
-            "
-
-      - name: Generate Checksums
-        run: |
-          sha256sum *.pkg.tar.zst > SHA256SUMS.txt
-          cat SHA256SUMS.txt
-
-      - name: Upload Package Artifact
+            -e GLASS_BUILD_JOBS=2 \
+            -e SCCACHE_DIR=/build/.sccache \
+            -e SCCACHE_CACHE_SIZE=5G \
+            -v "${GITHUB_WORKSPACE}:/build" -w /build \
+            archlinux:base-devel bash tools/build_in_container.sh
+      - name: Attest the compiled candidate
+        id: attest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: '${{ github.workspace }}/*.pkg.tar.zst'
+      - name: Save offline build attestation
+        env:
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: cp "$BUNDLE" artifacts/build-attestation.json
+      - name: Upload candidate package and build evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: chromium-glass-package
+          name: chromium-glass-candidate
           path: |
             *.pkg.tar.zst
-            SHA256SUMS.txt
+            artifacts/*
           retention-days: 14
-
-      - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/') || inputs.create_release == true
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            *.pkg.tar.zst
-            SHA256SUMS.txt
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
