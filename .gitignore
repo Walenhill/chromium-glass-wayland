@@ -10,3 +10,9 @@ enable-widevine-arm64.patch
 glibc-*.patch
 increase-fortify-level.patch
 use-oauth2-client-switches-as-default.patch
+.sccache/
+artifacts/
+compatibility.json
+update-status.json
+__pycache__/
+release/

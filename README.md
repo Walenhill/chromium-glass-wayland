@@ -70,13 +70,15 @@ The exact rule syntax can vary between Hyprland configuration frameworks.
 ## Repository layout
 
 - `chromium-glass-wayland.patch` is the transparency patch maintained here.
-- Arch build-fix patches are downloaded from a pinned official packaging tag
+- Arch build-fix patches are downloaded from a pinned official packaging commit
   and verified with SHA-256 instead of being duplicated in this repository.
 - `PKGBUILD` and `.SRCINFO` describe the reproducible Arch package.
 
 ## Notes
 
 - This is an unofficial Chromium build.
-- Rebuild promptly when Arch updates Chromium, especially for security fixes.
-- The package is currently based on Chromium `151.0.7922.108`.
+- The recipe is currently based on Chromium `155.0.8059.39`; this is a candidate,
+  not an approved binary release.
+- [Update checks, verified stable releases and optional auto-installation](docs/UPDATES.md)
+  keep compilation separate from release approval.
 - The packaging base comes from the official Arch Linux Chromium package.
