@@ -170,6 +170,21 @@ class CheckpointTests(unittest.TestCase):
         self.assertFalse(policy.uploaded_checkpoint(payload, "expected", "refs/heads/other"))
         self.assertFalse(policy.uploaded_checkpoint({"actions_caches": []}, "expected", "refs/heads/candidate"))
 
+    def test_hardlinked_ninja_outputs_are_saved_as_regular_files(self):
+        source = self.root / "source"
+        source.mkdir()
+        (source / "a.o").write_bytes(b"compiled object")
+        os.link(source / "a.o", source / "b.o")
+        cache = self.root / "cache"
+        try:
+            policy.save_checkpoint(source, cache, "a" * 64, 1)
+        except ValueError as error:
+            self.fail("Valid hardlinked build outputs were rejected: " + str(error))
+        restored = self.root / "restored"
+        policy.restore_checkpoint(restored, cache, "a" * 64)
+        self.assertEqual((restored / "a.o").read_bytes(), b"compiled object")
+        self.assertEqual((restored / "b.o").read_bytes(), b"compiled object")
+
 
 if __name__ == "__main__":
     unittest.main()

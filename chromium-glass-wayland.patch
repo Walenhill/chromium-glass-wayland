@@ -258,7 +258,7 @@
  #include "ui/color/color_id.h"
  #include "ui/color/color_provider.h"
  #include "ui/color/color_variant.h"
-@@ -247,8 +248,9 @@
+@@ -247,7 +248,8 @@
                                      ->use_ash_system_ui_layout()) {
    SetUseDefaultFillLayout(true);
    background_view_ = AddChildView(std::make_unique<View>());
@@ -269,7 +269,6 @@
 +    // GlassFrame menus composited as Aura children on Linux.
      background_view_->SetPaintToLayer();
      auto* background_layer = background_view_->layer();
-     background_layer->SetName("MenuScrollViewContainer/background");
 @@ -348,8 +350,11 @@
      return;
    }
