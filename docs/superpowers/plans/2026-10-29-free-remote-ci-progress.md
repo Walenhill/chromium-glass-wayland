@@ -14,3 +14,5 @@ Task 1: cross-run probe 40773639917/40773760134 exposed a changing cache key cau
 
 Task 1: complete — GREEN run 40774390681 (34 tests); cross-run probe 40774381220 -> 40774478915 restored progress 2 -> 3 without rebuilding the first output. Exact remote cache visibility gate passed; no Chromium compilation was used for this probe.
 Task 2: RED run 40774787950 exposed the milestone guard and missing remote-only preparation guard.
+
+Task 2: reviewed 156 renderer and remote-only guard pass in 40775631559 (37 tests). Source probe 40775624939 rejected one menu constructor hunk because upstream renamed a layer; context narrowed without changing Glass behavior. Added hardlink checkpoint regression before enabling long builds.

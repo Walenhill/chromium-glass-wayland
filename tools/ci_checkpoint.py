@@ -127,7 +127,7 @@ def save_checkpoint(output, cache, identity, completed, max_bytes=MAX_BYTES):
     cache.mkdir(parents=True, exist_ok=True)
     temporary = cache / "out.tar.zst.part"
     try:
-        subprocess.run(["tar", "-I", "zstd -T2 -3", "-cf", str(temporary),
+        subprocess.run(["tar", "--hard-dereference", "-I", "zstd -T2 -3", "-cf", str(temporary),
                         "-C", str(output), "."], check=True)
         if temporary.stat().st_size > max_bytes:
             raise ValueError("Checkpoint exceeds the free-cache size budget")
