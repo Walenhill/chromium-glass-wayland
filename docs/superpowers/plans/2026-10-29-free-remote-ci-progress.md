@@ -24,3 +24,13 @@ Task 3: in progress — independent whole-branch review and final remote verific
 
 Final review: fresh reviewer examined e71b68c..73dbbcd. Important: timeout could hide a previously logged Ninja failure; continuation did not require the exact cache at the consumer. Minor regraded Important: duplicate StartupWMClass can break real launcher/window association. All three enter the single RED/GREEN fix pass.
 Final: Ruling: Regrade duplicate desktop keys as Important — a reasonable user expects correct launcher association, not conflicting keys. Cost if left: platform-dependent wrong grouping/launch association.
+
+Final: fixed deadline masking — real parallel Ninja error/drain test RED 40781095814 -> GREEN 40781643713, full suite 43/43. Persisted child output is scanned before checkpoint classification.
+Final: fixed lost-checkpoint continuation — producer key/identity/progress are passed and enforced before source preparation and again in the container; missing/older checkpoint regression RED -> GREEN in the same suite. Exact cross-run resume passed 40781639673 -> 40781746368.
+Final: fixed duplicate desktop startup class — real rendered sed overlay on existing/missing/duplicate fields RED -> GREEN, full suite 43/43.
+Final: Ruling: Actual Chromium compile/link, checkpoint size and runner resource sufficiency remain empirical acceptance gates — a miniature probe cannot prove them. Cost: a full run may stop at a resource/size/stall bound; no paid fallback or endless retry is authorized.
+Final: Ruling: Native Wayland/GPU/second-window/installation checks remain pending and cannot run on the desktop without later authorization. Cost: appearance/runtime compatibility is unverified; no stable approval.
+Final: Ruling: Preserving CFI/ThinLTO/PGO recipe flags is not a security audit. Cost: the experimental build carries no vulnerability-free guarantee.
+Final: Ruling: Scheduled-update activation, main merge, stable release and updater installation are deferred until complete binary/visual validation. Cost: automatic desktop updates are not active yet.
+Final review: all reviewed Important issues (including regraded desktop association) fixed with RED/GREEN evidence; no deferred Minor findings. No second reviewer dispatched.
+Task 3: CI harness and source port verified. The full remote Chromium build is the next asynchronous acceptance gate. Keep this candidate head frozen during the chain; record live run URLs in PR #2 rather than changing source mid-build.

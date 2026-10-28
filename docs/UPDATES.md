@@ -22,12 +22,15 @@ capacity are not enabled.
 3. Dispatch `compile=true` for the real build. Each slice has a controlled
    **4h30m compilation deadline**, below GitHub's six-hour job limit. It saves
    compressed `out/Release`, including Ninja's dependency/log state, explicitly
-   before the job ends. The next run restores it and continues automatically.
+   before the job ends. The next run must restore that exact checkpoint key, identity and progress
+   before preparing sources; an evicted/missing/older checkpoint fails instead
+   of silently restarting. It then continues automatically.
 4. The cache key is frozen before generated files appear. Actual package
    inventory, pinned source/recipe/tool inputs and a stable source epoch bind
    the checkpoint identity. The Arch container digest and repository snapshot
    are pinned; mismatches, corrupt archives, traversal/links, oversized
-   checkpoints, no progress, or actual compiler errors stop the chain.
+   checkpoints, no progress, or actual compiler errors stop the chain. Persisted Ninja failure evidence
+   overrides a deadline, including an error logged while other edges drain.
    Hardlinked outputs are archived as regular files. The checkpoint ceiling is
    **8 GiB compressed / 64 GiB uncompressed**; the existing cache quota is not
    increased. Automatic continuation requires a visible exact branch cache and
