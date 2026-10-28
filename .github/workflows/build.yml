@@ -75,6 +75,7 @@ jobs:
       attestations: write
     outputs:
       state: ${{ steps.result.outputs.state }}
+      checkpoint_key: ${{ steps.checkpoint_key.outputs.key }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -93,13 +94,24 @@ jobs:
           sudo chmod 600 "$swap_path"
           sudo mkswap "$swap_path"
           sudo swapon "$swap_path"
+      - name: Freeze cache key before generating any files
+        id: checkpoint_key
+        env:
+          PROBE: ${{ inputs.probe || false }}
+        run: |
+          digest=$(python3 tools/ci_checkpoint.py identity --root "$PWD" --packages /dev/null --epoch 1)
+          kind=ninja
+          [[ "$PROBE" != true ]] || kind=probe
+          prefix="$kind-$digest-$ARCH_SNAPSHOT-"
+          echo "prefix=$prefix" >> "$GITHUB_OUTPUT"
+          echo "key=$prefix$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
       - name: Restore a compatible checkpoint
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: .checkpoint
-          key: ${{ inputs.probe && 'probe' || 'ninja' }}-${{ hashFiles('PKGBUILD', 'upstream.json', 'chromium-glass-wayland.patch', 'tools/**') }}-${{ env.ARCH_SNAPSHOT }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: ${{ steps.checkpoint_key.outputs.key }}
           restore-keys: |
-            ${{ inputs.probe && 'probe' || 'ninja' }}-${{ hashFiles('PKGBUILD', 'upstream.json', 'chromium-glass-wayland.patch', 'tools/**') }}-${{ env.ARCH_SNAPSHOT }}-
+            ${{ steps.checkpoint_key.outputs.prefix }}
       - name: Build one bounded slice
         id: slice
         env:
@@ -138,7 +150,7 @@ jobs:
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: .checkpoint
-          key: ${{ inputs.probe && 'probe' || 'ninja' }}-${{ hashFiles('PKGBUILD', 'upstream.json', 'chromium-glass-wayland.patch', 'tools/**') }}-${{ env.ARCH_SNAPSHOT }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: ${{ steps.checkpoint_key.outputs.key }}
       - name: Attest only a complete compiled candidate
         if: steps.result.outputs.state == 'complete' && !inputs.probe
         id: attest
@@ -168,6 +180,27 @@ jobs:
       actions: write
       contents: read
     steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Require uploaded cache before continuing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEY: ${{ needs.build.outputs.checkpoint_key }}
+        run: |
+          for retry in 1 2 3; do
+            gh api --method GET "repos/$GITHUB_REPOSITORY/actions/caches" -f key="$KEY" -f ref="$GITHUB_REF" > uploaded-cache.json
+            if python3 - <<'PY'
+          import json, os, sys
+          sys.path.insert(0, 'tools')
+          from ci_checkpoint import uploaded_checkpoint
+          raise SystemExit(0 if uploaded_checkpoint(json.load(open('uploaded-cache.json')), os.environ['KEY'], os.environ['GITHUB_REF']) else 1)
+          PY
+            then exit 0; fi
+            sleep 5
+          done
+          echo 'No durable cache is visible; refusing a wasteful restart.'
+          exit 1
       - name: Queue next bounded slice at the same source revision
         env:
           GH_TOKEN: ${{ github.token }}

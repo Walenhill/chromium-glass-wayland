@@ -9,3 +9,5 @@ Pre-flight: Task 1 produces state/identity consumed by Task 2's driver and Task 
 
 Task 1: core RED confirmed in run 40772179454 (15 missing-policy failures); GREEN confirmed in run 40772617231 (32 tests, including real Ninja resume).
 Ruling: A pinned container digest and Arch snapshot 2026/10/28 freeze dependency inputs across slices; actual pacman inventory additionally binds checkpoint identity. Cost: snapshot refresh needs a new identity/rebuild.
+
+Task 1: cross-run probe 40773639917/40773760134 exposed a changing cache key caused by generated __pycache__ files. Regression run 40774135230 confirms two RED tests for stable key inputs and exact remote cache visibility.

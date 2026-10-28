@@ -47,6 +47,19 @@ def fingerprint(files, packages, epoch):
     return digest.hexdigest()
 
 
+def input_fingerprint(root, packages, epoch):
+    paths = ["PKGBUILD", "upstream.json", "chromium-glass-wayland.patch"]
+    paths += [str(p.relative_to(root)) for p in (root / "tools").glob("*")
+              if p.is_file() and p.suffix in (".py", ".sh")]
+    return fingerprint({p: (root / p).read_bytes() for p in paths}, packages, epoch)
+
+
+def uploaded_checkpoint(payload, key, ref):
+    return any(entry.get("key") == key and entry.get("ref") == ref and
+               type(entry.get("size_in_bytes")) is int and entry["size_in_bytes"] > 0
+               for entry in payload.get("actions_caches", []))
+
+
 def validate_member(member):
     path = PurePosixPath(member.name)
     if path.is_absolute() or ".." in path.parts or "\\" in member.name:
@@ -183,10 +196,7 @@ def main():
     action.add_argument("argv", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.command == "identity":
-        paths = ["PKGBUILD", "upstream.json", "chromium-glass-wayland.patch"]
-        paths += [str(p.relative_to(args.root)) for p in (args.root / "tools").glob("*") if p.is_file()]
-        print(fingerprint({p: (args.root / p).read_bytes() for p in paths},
-                          args.packages.read_text(), args.epoch))
+        print(input_fingerprint(args.root, args.packages.read_text(), args.epoch))
     elif args.command == "normalize":
         normalize_sources(args.source, args.epoch)
     elif args.command == "save":
