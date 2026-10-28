@@ -64,20 +64,30 @@ def check_contracts(destination):
 
 
 def fetch(path, version, destination):
-    url = f"https://chromium.googlesource.com/chromium/src/+/{version}/{path}?format=TEXT"
+    origins = [
+        (f"https://chromium.googlesource.com/chromium/src/+/{version}/{path}?format=TEXT", True),
+        (f"https://raw.githubusercontent.com/chromium/chromium/{version}/{path}", False),
+    ]
+    last_error = None
     for attempt in range(3):
-        try:
-            with urllib.request.urlopen(url, timeout=45) as response:
-                data = base64.b64decode(response.read(), validate=True)
-            target = destination / path
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(data)
-            return
-        except Exception:
-            if attempt == 2:
-                raise
+        for url, encoded in origins:
+            try:
+                with urllib.request.urlopen(url, timeout=30) as response:
+                    data = response.read()
+                if encoded:
+                    data = base64.b64decode(data, validate=True)
+                if not data or data.lstrip().lower().startswith(b"<!doctype"):
+                    raise ValueError("Unexpected upstream source response")
+                data.decode("utf-8")
+                target = destination / path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(data)
+                return
+            except Exception as error:
+                last_error = error
+        if attempt < 2:
             time.sleep(2 ** attempt)
-
+    raise RuntimeError(f"Cannot fetch {path} at {version} from official source mirrors") from last_error
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
