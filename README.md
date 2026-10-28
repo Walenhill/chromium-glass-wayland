@@ -77,7 +77,7 @@ The exact rule syntax can vary between Hyprland configuration frameworks.
 ## Notes
 
 - This is an unofficial Chromium build.
-- The recipe is currently based on Chromium `155.0.8059.39`; this is a candidate,
+- The recipe is currently based on Chromium `156.0.8078.73`; this is a candidate,
   not an approved binary release.
 - [Update checks, verified stable releases and optional auto-installation](docs/UPDATES.md)
   keep compilation separate from release approval.

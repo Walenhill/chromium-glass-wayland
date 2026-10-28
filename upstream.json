@@ -1,8 +1,10 @@
 {
-  "version": "155.0.8059.39",
-  "arch_recipe_version": "153.0.8010.52",
-  "arch_commit": "e01d89c346c9c67fda9b444b3355b2eda85a4f56",
-  "source_sha256": "d450182ea38a6485febfdfdad6f3a3f1d5d3408cc368329b94502c629ef8ec7e",
+  "version": "156.0.8078.73",
+  "arch_recipe_version": "156.0.8078.73",
+  "arch_commit": "8ec86828d5fad19ff66ec7fcaebfe223c9252838",
+  "source_sha256": "cfdf8def1207b81af1231e5170bf849896cd353e72220ca05d93432e31551d59",
   "glass_patch_sha256": "8924ecf26d99c49150acdc6c3c225ed7e0777d93903e5e3ae375f50090ef56ba",
+  "source_date_epoch": 1793140778,
+  "arch_snapshot": "2026/10/28",
   "status": "candidate; full build and visual validation required"
 }
