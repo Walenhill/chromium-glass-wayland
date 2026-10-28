@@ -9,6 +9,8 @@ import re
 import signal
 import subprocess
 import tarfile
+import sys
+import threading
 import time
 
 MAX_BYTES = 8 * 1024 ** 3
@@ -16,7 +18,9 @@ MAX_RAW_BYTES = 64 * 1024 ** 3
 MAX_ATTEMPTS = 6
 
 
-def classify(returncode, timed_out, attempt, previous_progress, current_progress):
+def classify(returncode, timed_out, attempt, previous_progress, current_progress, failure_evidence=False):
+    if failure_evidence:
+        return "failed"
     if returncode == 0 and not timed_out:
         return "complete"
     if not timed_out:
@@ -60,6 +64,26 @@ def uploaded_checkpoint(payload, key, ref):
                for entry in payload.get("actions_caches", []))
 
 
+def require_resume(attempt, expected_key, restored_key, expected_identity, expected_progress, manifest):
+    if attempt == 1 and not expected_key:
+        return
+    if not expected_key or restored_key != expected_key:
+        raise ValueError("Required exact checkpoint is unavailable; refusing a fresh automatic build")
+    if not re.fullmatch("[a-f0-9]{64}", expected_identity) or expected_progress <= 0:
+        raise ValueError("Missing continuation identity/progress")
+    if not isinstance(manifest, dict) or manifest.get("schema") != 1:
+        raise ValueError("Required checkpoint manifest is unavailable")
+    if manifest.get("identity") != expected_identity or manifest.get("progress") != expected_progress:
+        raise ValueError("Required checkpoint identity/progress does not match the producer")
+
+
+def failed_output(path):
+    text = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", path.read_text(errors="replace"))
+    return any(line.lstrip().startswith("FAILED:") or
+               "ninja: build stopped: subcommand failed" in line
+               for line in text.splitlines())
+
+
 def validate_member(member):
     path = PurePosixPath(member.name)
     if path.is_absolute() or ".." in path.parts or "\\" in member.name:
@@ -68,27 +92,68 @@ def validate_member(member):
         raise ValueError("Checkpoint links and special files are not allowed")
 
 
-def supervise(command, seconds, grace=120):
+def supervise(command, seconds, grace=120, log=None):
     if seconds <= 0 or grace <= 0:
         raise ValueError("Build deadline must be positive")
-    child = subprocess.Popen(command, start_new_session=True)
-    try:
-        return child.wait(timeout=seconds), False
-    except subprocess.TimeoutExpired:
+    stream = None
+    reader = None
+    errors = []
+    if log:
+        log.parent.mkdir(parents=True, exist_ok=True)
+        stream = log.open("wb")
+    child = subprocess.Popen(command, start_new_session=True,
+                             stdout=subprocess.PIPE if stream else None,
+                             stderr=subprocess.STDOUT if stream else None)
+    def signal_group(value):
         try:
-            os.killpg(child.pid, signal.SIGINT)
+            os.killpg(child.pid, value)
         except ProcessLookupError:
             pass
-        try:
-            code = child.wait(timeout=grace)
-        except subprocess.TimeoutExpired:
+    if stream:
+        def copy_output():
             try:
-                os.killpg(child.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            code = child.wait()
-        return code, True
-
+                for chunk in iter(lambda: child.stdout.read1(65536), b""):
+                    stream.write(chunk)
+                    stream.flush()
+                    console = getattr(sys.stdout, "buffer", None)
+                    if console:
+                        console.write(chunk)
+                    else:
+                        sys.stdout.write(chunk.decode("utf-8", errors="replace"))
+                    sys.stdout.flush()
+            except Exception as error:
+                errors.append(error)
+                signal_group(signal.SIGKILL)
+        reader = threading.Thread(target=copy_output, daemon=True)
+        reader.start()
+    expired = False
+    try:
+        try:
+            result = child.wait(timeout=seconds)
+        except subprocess.TimeoutExpired:
+            expired = True
+            signal_group(signal.SIGINT)
+            try:
+                result = child.wait(timeout=grace)
+            except subprocess.TimeoutExpired:
+                signal_group(signal.SIGKILL)
+                result = child.wait()
+    finally:
+        if expired or child.poll() is None:
+            signal_group(signal.SIGKILL)
+            child.wait()
+        if reader:
+            reader.join(timeout=10)
+            if reader.is_alive():
+                signal_group(signal.SIGKILL)
+                reader.join(timeout=5)
+            if reader.is_alive():
+                raise RuntimeError("Build subprocess retained its output pipe after termination")
+        if stream:
+            stream.close()
+    if errors:
+        raise RuntimeError("Could not persist build failure evidence") from errors[0]
+    return result, expired
 
 def normalize_sources(source, epoch):
     if source.is_symlink() or not source.is_dir() or epoch < 1:
@@ -187,6 +252,13 @@ def main():
         action.add_argument("--output", type=Path, required=True)
         action.add_argument("--cache", type=Path, required=True)
         action.add_argument("--identity", required=True)
+    resume = commands.add_parser("resume")
+    resume.add_argument("--cache", type=Path, required=True)
+    resume.add_argument("--attempt", type=int, required=True)
+    resume.add_argument("--expected-key", required=True)
+    resume.add_argument("--restored-key", required=True)
+    resume.add_argument("--identity", required=True)
+    resume.add_argument("--progress", type=int, required=True)
     action = commands.add_parser("run")
     action.add_argument("--output", type=Path, required=True)
     action.add_argument("--state", type=Path, required=True)
@@ -204,6 +276,11 @@ def main():
                                          progress(args.output / ".ninja_log"))))
     elif args.command == "restore":
         print(restore_checkpoint(args.output, args.cache, args.identity))
+    elif args.command == "resume":
+        path = args.cache / "manifest.json"
+        manifest = json.loads(path.read_text()) if path.is_file() and not path.is_symlink() else None
+        require_resume(args.attempt, args.expected_key, args.restored_key,
+                       args.identity, args.progress, manifest)
     else:
         if not 1 <= args.attempt <= MAX_ATTEMPTS:
             parser.error("Slice number must be in 1..6")
@@ -211,12 +288,14 @@ def main():
         if not command:
             parser.error("Missing build command")
         started = time.monotonic()
-        result, timed_out = supervise(command, args.seconds)
+        log = args.state.parent / "command.log"
+        result, timed_out = supervise(command, args.seconds, log=log)
+        failure = failed_output(log)
         done = progress(args.output / ".ninja_log")
-        state = classify(result, timed_out, args.attempt, args.previous, done)
+        state = classify(result, timed_out, args.attempt, args.previous, done, failure)
         meta = {"state": state, "attempt": args.attempt, "previous_progress": args.previous,
                 "progress": done, "returncode": result, "deadline_reached": timed_out,
-                "elapsed_seconds": round(time.monotonic() - started)}
+                "failure_evidence": failure, "elapsed_seconds": round(time.monotonic() - started)}
         args.state.parent.mkdir(parents=True, exist_ok=True)
         args.state.write_text(json.dumps(meta, indent=2) + "\n")
         print(json.dumps(meta), flush=True)

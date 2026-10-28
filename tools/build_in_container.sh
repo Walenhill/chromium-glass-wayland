@@ -46,6 +46,9 @@ su builder -s /bin/bash -c '
     exit 0
   fi
 
+  python3 tools/ci_checkpoint.py resume --cache "$PWD/.checkpoint" --attempt "${GLASS_BUILD_ATTEMPT:-1}" \
+    --expected-key "${GLASS_EXPECTED_KEY:-}" --restored-key "${GLASS_RESTORED_KEY:-}" \
+    --identity "${GLASS_EXPECTED_IDENTITY:-}" --progress "${GLASS_EXPECTED_PROGRESS:-0}"
   previous=$(python3 tools/ci_checkpoint.py restore --output "$output" --cache "$PWD/.checkpoint" --identity "$identity")
   set +e
   python3 tools/ci_checkpoint.py run --output "$output" --state artifacts/build-state.json \

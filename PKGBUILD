@@ -480,6 +480,7 @@ package() {
 --class=chromium-glass
 EOF
   sed -i -e 's/^Name=Chromium$/Name=Chromium Glass/' \
+    -e '/^StartupWMClass=/d' \
     -e '/^StartupNotify=true$/a StartupWMClass=chromium-glass' \
     "$pkgdir/usr/share/applications/chromium.desktop"
 

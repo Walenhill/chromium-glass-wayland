@@ -23,6 +23,18 @@ on:
         description: 'Continuation slice, 1..6'
         type: number
         default: 1
+      checkpoint_key:
+        description: 'Exact producer checkpoint key (automatic continuation only)'
+        type: string
+        default: ''
+      checkpoint_identity:
+        description: 'Producer checkpoint identity'
+        type: string
+        default: ''
+      checkpoint_progress:
+        description: 'Producer completed-output count'
+        type: number
+        default: 0
       expected_sha:
         description: 'Pinned source SHA for automatic continuations'
         type: string
@@ -80,6 +92,8 @@ jobs:
     outputs:
       state: ${{ steps.result.outputs.state }}
       checkpoint_key: ${{ steps.checkpoint_key.outputs.key }}
+      progress: ${{ steps.result.outputs.progress }}
+      identity: ${{ steps.result.outputs.identity }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -110,17 +124,31 @@ jobs:
           echo "prefix=$prefix" >> "$GITHUB_OUTPUT"
           echo "key=$prefix$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
       - name: Restore a compatible checkpoint
+        id: restore
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: .checkpoint
-          key: ${{ steps.checkpoint_key.outputs.key }}
-          restore-keys: |
-            ${{ steps.checkpoint_key.outputs.prefix }}
+          key: ${{ inputs.checkpoint_key || steps.checkpoint_key.outputs.key }}
+          restore-keys: ${{ (!inputs.checkpoint_key && !inputs.probe) && steps.checkpoint_key.outputs.prefix || '' }}
+      - name: Require exact automatic-resume inputs before preparation
+        env:
+          ATTEMPT: ${{ inputs.attempt || 1 }}
+          EXPECTED_KEY: ${{ inputs.checkpoint_key }}
+          RESTORED_KEY: ${{ steps.restore.outputs.cache-matched-key }}
+          IDENTITY: ${{ inputs.checkpoint_identity }}
+          PROGRESS: ${{ inputs.checkpoint_progress || 0 }}
+        run: |
+          python3 tools/ci_checkpoint.py resume --cache .checkpoint --attempt "$ATTEMPT" \
+            --expected-key "$EXPECTED_KEY" --restored-key "$RESTORED_KEY" --identity "$IDENTITY" --progress "$PROGRESS"
       - name: Build one bounded slice
         id: slice
         env:
           PROBE: ${{ inputs.probe || false }}
           ATTEMPT: ${{ inputs.attempt || 1 }}
+          EXPECTED_KEY: ${{ inputs.checkpoint_key }}
+          RESTORED_KEY: ${{ steps.restore.outputs.cache-matched-key }}
+          IDENTITY: ${{ inputs.checkpoint_identity }}
+          PROGRESS: ${{ inputs.checkpoint_progress || 0 }}
         run: |
           mkdir -p artifacts .checkpoint
           if [[ "$PROBE" == true ]]; then
@@ -129,6 +157,8 @@ jobs:
             docker run --rm -e GITHUB_ACTIONS=true \
               -e GLASS_HOST_UID="$(id -u)" -e GLASS_ARCH_SNAPSHOT="$ARCH_SNAPSHOT" \
               -e GLASS_BUILD_ATTEMPT="$ATTEMPT" -e GLASS_BUILD_SECONDS=16200 -e GLASS_BUILD_JOBS=4 \
+              -e GLASS_EXPECTED_KEY="$EXPECTED_KEY" -e GLASS_RESTORED_KEY="$RESTORED_KEY" \
+              -e GLASS_EXPECTED_IDENTITY="$IDENTITY" -e GLASS_EXPECTED_PROGRESS="$PROGRESS" \
               -v "${GITHUB_WORKSPACE}:/build" -w /build "$ARCH_IMAGE" bash tools/build_in_container.sh
           fi
       - name: Collect explicit slice state
@@ -144,7 +174,8 @@ jobs:
               if not state.get('checkpoint_saved') or checkpoint['progress'] != state['progress'] or checkpoint['identity'] != state['identity']:
                   raise ValueError('Checkpoint was not durably prepared; refusing continuation')
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
-              output.write('state=' + state['state'] + '\n')
+              for field in ('state', 'progress', 'identity'):
+                  output.write(field + '=' + str(state.get(field, '')) + '\n')
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
               summary.write('Slice state (not binary approval):\n\n' + json.dumps(state, indent=2) + '\n')
           PY
@@ -210,6 +241,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ATTEMPT: ${{ inputs.attempt || 1 }}
           PROBE: ${{ inputs.probe || false }}
+          KEY: ${{ needs.build.outputs.checkpoint_key }}
+          IDENTITY: ${{ needs.build.outputs.identity }}
+          PROGRESS: ${{ needs.build.outputs.progress }}
         run: |
           test "$ATTEMPT" -lt 6
           current=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$GITHUB_REF_NAME" --jq .object.sha)
@@ -220,7 +254,8 @@ jobs:
           next=$((ATTEMPT + 1))
           gh workflow run build.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" \
             -f compile="$([[ "$PROBE" == true ]] && echo false || echo true)" \
-            -f probe="$PROBE" -f attempt="$next" -f expected_sha="$GITHUB_SHA"
+            -f probe="$PROBE" -f attempt="$next" -f expected_sha="$GITHUB_SHA" \
+            -f checkpoint_key="$KEY" -f checkpoint_identity="$IDENTITY" -f checkpoint_progress="$PROGRESS"
 
   prepare:
     needs: compatibility

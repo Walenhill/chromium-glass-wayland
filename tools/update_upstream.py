@@ -106,6 +106,7 @@ def render(arch, commit, version, source_sha, glass_sha):
                         "  install -Dvm644 /dev/stdin \"$pkgdir/etc/chromium-flags.conf\" <<'EOF'\n"
                         "--ozone-platform=wayland\n--enable-features=GlassFrame\n--class=chromium-glass\nEOF\n"
                         "  sed -i -e 's/^Name=Chromium$/Name=Chromium Glass/' \\\n"
+                        "    -e '/^StartupWMClass=/d' \\\n"
                         "    -e '/^StartupNotify=true$/a StartupWMClass=chromium-glass' \\\n"
                         '    "$pkgdir/usr/share/applications/chromium.desktop"\n\n' + m[0])
     return text
