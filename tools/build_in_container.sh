@@ -19,6 +19,9 @@ chmod 0440 /etc/sudoers.d/glass-builder
 su builder -s /bin/bash -c '
   set -euo pipefail
   mkdir -p artifacts .checkpoint
+  if [[ "${GLASS_PREPARE_ONLY:-false}" == true ]]; then
+    makepkg --printsrcinfo > .SRCINFO
+  fi
   python3 tools/validate_metadata.py
   timeout --signal=TERM --kill-after=120s 45m makepkg --noconfirm --syncdeps --needed --nobuild 2>&1 | tee artifacts/prepare.log
   makepkg --printsrcinfo > .SRCINFO

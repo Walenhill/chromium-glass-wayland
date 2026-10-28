@@ -11,6 +11,10 @@ on:
         description: 'Run a bounded Chromium build slice'
         type: boolean
         default: false
+      prepare:
+        description: 'Prepare current Linux Stable inputs and validate GN on GitHub (no full compile)'
+        type: boolean
+        default: false
       probe:
         description: 'Test checkpoint/restore across two short GitHub runs (no Chromium)'
         type: boolean
@@ -217,3 +221,60 @@ jobs:
           gh workflow run build.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" \
             -f compile="$([[ "$PROBE" == true ]] && echo false || echo true)" \
             -f probe="$PROBE" -f attempt="$next" -f expected_sha="$GITHUB_SHA"
+
+  prepare:
+    needs: compatibility
+    if: github.event_name == 'workflow_dispatch' && inputs.prepare && !inputs.compile && !inputs.probe
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Resolve Stable, pin Arch packaging and verify source archive
+        run: python3 tools/update_upstream.py --prepare
+      - name: Validate complete source preparation and GN on GitHub only
+        run: |
+          mkdir -p artifacts
+          docker run --rm -e GITHUB_ACTIONS=true -e GLASS_PREPARE_ONLY=true \
+            -e GLASS_HOST_UID="$(id -u)" -e GLASS_ARCH_SNAPSHOT="$ARCH_SNAPSHOT" \
+            -v "${GITHUB_WORKSPACE}:/build" -w /build "$ARCH_IMAGE" bash tools/build_in_container.sh
+          python3 tools/validate_metadata.py
+      - name: Commit only validated candidate inputs, never build outputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib, subprocess
+          repo, branch = os.environ['GITHUB_REPOSITORY'], os.environ['GITHUB_REF_NAME']
+          def api(path, method='GET', data=None):
+              args = ['gh', 'api', f'repos/{repo}/{path}']
+              if method != 'GET':
+                  args += ['--method', method, '--input', '-']
+              return json.loads(subprocess.check_output(args, input=json.dumps(data) if data is not None else None, text=True))
+          head = api('git/ref/heads/' + branch)['object']['sha']
+          if head != os.environ['GITHUB_SHA']:
+              raise ValueError('Candidate branch changed during preparation; refusing overwrite')
+          files = ['PKGBUILD', '.SRCINFO', 'upstream.json', 'README.md']
+          tree = api('git/commits/' + head)['tree']['sha']
+          entries = [{'path': p, 'mode': '100644', 'type': 'blob', 'content': pathlib.Path(p).read_text()} for p in files]
+          tree = api('git/trees', 'POST', {'base_tree': tree, 'tree': entries})['sha']
+          version = json.loads(pathlib.Path('upstream.json').read_text())['version']
+          commit = api('git/commits', 'POST', {'message': f'Prepare verified Chromium {version} source inputs', 'parents': [head], 'tree': tree})['sha']
+          api('git/refs/heads/' + branch, 'PATCH', {'sha': commit, 'force': False})
+          print('Prepared candidate commit:', commit)
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as output:
+              output.write(f'Source/GN preparation passed for {version}. Full compile and visual approval remain pending. Commit: {commit}\\n')
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: source-preparation
+          path: |
+            artifacts/*
+            PKGBUILD
+            .SRCINFO
+            upstream.json
+          retention-days: 14
