@@ -16,3 +16,6 @@ compatibility.json
 update-status.json
 __pycache__/
 release/
+.checkpoint/
+.probe-output/
+uploaded-cache.json

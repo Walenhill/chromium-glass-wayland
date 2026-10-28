@@ -1,15 +1,14 @@
 # Project status
 
-> **Experimental project — temporarily paused**
+> **Experimental project — remote update in progress**
 
 Chromium Glass is an unofficial, experimental Chromium modification. It is a
 personal research project rather than a production-ready browser distribution,
 and it should not be treated as an official Chromium build.
 
-Development is temporarily paused as of August 2026. The maintainer expects to
-be unavailable for about two weeks, and active work may remain paused for up to
-approximately one month. This is not an abandonment notice; development is
-expected to continue afterward when time permits.
+Development resumed on 29 October 2026 after the earlier temporary pause.
+A Chromium 156 candidate is being prepared through free GitHub-hosted CI.
+Source/recipe/GN checks are not a completed browser build or visual approval.
 
 ## Published version
 
@@ -22,9 +21,9 @@ The latest stable version currently published in this repository is
   upstream Chromium and therefore may miss current security fixes. Do not
   assume it has the same security status as the current official Arch Chromium
   package.
-- **Updates currently require a full local Chromium build.** Compilation is
-  slow and consumes substantial CPU time, memory, and disk space. Prebuilt,
-  signed packages and an automated update pipeline are not available yet.
+- **A current verified binary is not available yet.** Maintained compilation
+  now runs on GitHub, using bounded checkpoints rather than the desktop.
+  The new candidate still requires full compilation and runtime/visual checks.
 - **The patch is version-sensitive.** Chromium UI and compositor internals
   change frequently, so every upstream update requires porting, rebuilding, and
   visual testing. A newer Chromium port is currently unfinished and is not part
@@ -48,6 +47,6 @@ The latest stable version currently published in this repository is
 - **Testing is currently personal and limited.** There is no comprehensive
   automated visual, compositor, upgrade, or multi-GPU test suite.
 
-Until active development resumes, the official Arch Chromium package is the
+While a current verified Glass release is unavailable, the official Arch Chromium package is the
 safer choice for users who prioritize prompt security updates and predictable
 maintenance over the experimental glass appearance.

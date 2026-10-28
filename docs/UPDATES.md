@@ -6,30 +6,52 @@ the others. A candidate is never automatically considered stable.
 
 ## Maintainer pipeline
 
-1. `update.yml` checks official **Linux Stable** daily and opens a candidate PR.
-   The Arch recipe is pinned to a commit. Strict patch counts, zero-fuzz
-   application and required integration snippets reject incomplete ports.
-2. `build.yml` prepares/builds in a disposable Arch container, caches compiler
-   output, checks runtime libraries, version and headless startup, and attaches
-   a build attestation. Full builds need substantial disk/RAM and time; runners
-   without 80 GiB free fail early. A configured build runner can be selected
-   through the workflow's `runner` input. Nothing is installed on the desktop.
-3. Check the exact candidate in native Wayland with an isolated test profile:
-   toolbar and inactive/active tabs, omnibox/history, main and context menus,
-   bubbles/extensions, light/dark themes, rounded edges, and **a second new
-   window**. Check CPU/RAM responsiveness with menus both closed and open.
-   Do not approve a regression just because the build is successful.
-4. Merge the tested inputs to `main`. Run `release.yml` **from main** with the
-   successful build run ID and `visual_approved=true`. It checks build origin,
-   attestation, unchanged build inputs and smoke evidence. It publishes the
-   package plus `stable.json`, a build attestation and a separate approval
-   attestation. Existing release assets are not overwritten.
+All source archives, package dependencies, GN generation, tests and Chromium
+compilation run on **standard GitHub-hosted ubuntu-24.04 runners**, not the
+maintainer's desktop. Larger runners, external build servers and paid cache
+capacity are not enabled.
 
-The approval is a maintainer's human decision, not an automated visual test or
-security audit. These attestations authenticate the build/approval workflows;
-they do not prove that Chromium has no vulnerabilities. Future milestones
-currently stop for a reviewed port; the recipe generator supports milestone
-155 only. Security updates in that milestone still require a rebuild/test.
+1. Dispatch `build.yml` with `prepare=true` to resolve official Linux Stable,
+   verify its complete archive against the pinned Arch recipe when versions
+   match, port/validate every Glass hunk with zero fuzz, prepare all build
+   dependencies, and generate GN. Only validated PKGBUILD/.SRCINFO/upstream
+   metadata are committed to the candidate branch. This is not a binary build.
+2. Dispatch `probe=true` for a short real Ninja build spanning two GitHub runs.
+   It must restore the first run's outputs and finish without recompiling the
+   completed first file before a new checkpoint implementation is trusted.
+3. Dispatch `compile=true` for the real build. Each slice has a controlled
+   **4h30m compilation deadline**, below GitHub's six-hour job limit. It saves
+   compressed `out/Release`, including Ninja's dependency/log state, explicitly
+   before the job ends. The next run restores it and continues automatically.
+4. The cache key is frozen before generated files appear. Actual package
+   inventory, pinned source/recipe/tool inputs and a stable source epoch bind
+   the checkpoint identity. The Arch container digest and repository snapshot
+   are pinned; mismatches, corrupt archives, traversal/links, oversized
+   checkpoints, no progress, or actual compiler errors stop the chain.
+   Hardlinked outputs are archived as regular files. The checkpoint ceiling is
+   **8 GiB compressed / 64 GiB uncompressed**; the existing cache quota is not
+   increased. Automatic continuation requires a visible exact branch cache and
+   stops after at most **six slices**. This is not an infinite retry loop.
+5. Only a complete package with version/library/headless checks gets a build
+   attestation. A successful checkpoint-only workflow is **not** a successful
+   browser build and cannot pass release promotion. Cache expiry/eviction or a
+   source/ABI change can still require rebuilding; the tiny probe is evidence
+   for the mechanism, not proof of full Chromium performance or compatibility.
+6. Check that exact candidate in native Wayland with an isolated test profile:
+   toolbar and tabs, omnibox/history, main/context menus, bubbles/extensions,
+   light/dark themes, rounded edges and **a second new window**. Check resource
+   usage with menus open and closed.
+7. Merge only tested inputs to `main`. Run `release.yml` from main with the
+   successful complete build run ID and `visual_approved=true`. It verifies
+   origin, unchanged build inputs, attestation and smoke evidence before
+   publishing the package and signed approval manifest.
+
+The scheduled `update.yml` pipeline is inactive until merged to the default
+branch. It does not make untested builds stable. Recipe ports currently cover
+reviewed milestones **155 and 156**; an unknown milestone fails closed for
+review. A maintainer approval is not an automated visual test or security audit.
+Artifact availability is limited by configured retention; no stable release
+exists merely because candidate inputs or source checks passed.
 
 ## Desktop automatic installation
 
@@ -89,6 +111,6 @@ Source-only diagnosis commands:
 ```bash
 python3 -m unittest discover -s tests -v
 python3 tools/validate_metadata.py
-python3 tools/check_compatibility.py 155.0.8059.39 --report compatibility.json
-python3 tools/check_packaging.py /path/to/chromium-155.0.8059.39-lite.tar.xz
+python3 tools/check_compatibility.py 156.0.8078.73 --report compatibility.json
+python3 tools/check_packaging.py /path/to/chromium-156.0.8078.73-lite.tar.xz
 ```

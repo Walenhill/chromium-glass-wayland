@@ -16,3 +16,8 @@ Task 1: complete — GREEN run 40774390681 (34 tests); cross-run probe 407743812
 Task 2: RED run 40774787950 exposed the milestone guard and missing remote-only preparation guard.
 
 Task 2: reviewed 156 renderer and remote-only guard pass in 40775631559 (37 tests). Source probe 40775624939 rejected one menu constructor hunk because upstream renamed a layer; context narrowed without changing Glass behavior. Added hardlink checkpoint regression before enabling long builds.
+
+Task 2: complete — run 40778207204 verified official 156.0.8078.73 archive SHA256 cfdf8def1207b81af1231e5170bf849896cd353e72220ca05d93432e31551d59 against Arch 8ec86828d5fad19ff66ec7fcaebfe223c9252838; all Glass hunks and full package preparation succeeded; bundled GN produced 36218 targets / 5069 files. Generated candidate commit a828323839a1cf89b8f943eedd41796184fcbeb0.
+Task 2: hardlinks regression RED 40776083166 -> GREEN unit suite 40777108339; mirrored source fetch RED 40778036397 -> GREEN 40778213237. All 40 tests pass.
+Ruling: Preserve both upstream menu-layer names using balanced two-line context, rather than changing the layer's name or Glass behavior. Cost: strict application and regression checks remain required for future ports.
+Task 3: in progress — independent whole-branch review and final remote verification pending; full Chromium compile not yet started.
