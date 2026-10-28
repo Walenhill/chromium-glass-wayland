@@ -185,6 +185,37 @@ class CheckpointTests(unittest.TestCase):
         self.assertEqual((restored / "a.o").read_bytes(), b"compiled object")
         self.assertEqual((restored / "b.o").read_bytes(), b"compiled object")
 
+    def test_ninja_error_while_other_edges_drain_is_not_a_checkpoint(self):
+        output = self.root / "output"
+        output.mkdir()
+        (output / "build.ninja").write_text(
+            "rule good\n  command = printf done > $out\n"
+            "rule bad\n  command = sleep 0.1; false\n"
+            "rule slow\n  command = sleep 10; printf done > $out\n"
+            "build good: good\nbuild bad: bad good\nbuild slow: slow good\n"
+            "build all: phony bad slow\ndefault all\n")
+        state = self.root / "state.json"
+        cli = Path(__file__).resolve().parents[1] / "tools/ci_checkpoint.py"
+        result = subprocess.run([sys.executable, str(cli), "run", "--output", str(output),
+            "--state", str(state), "--seconds", "1", "--attempt", "1", "--previous", "0",
+            "--", "ninja", "-j", "2", "-k", "0", "-C", str(output)],
+            text=True, capture_output=True, timeout=15)
+        self.assertIn("FAILED:", result.stdout)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertEqual(json.loads(state.read_text())["state"], "failed")
+
+    def test_automatic_resume_requires_the_exact_checkpoint_and_baseline(self):
+        self.assertTrue(hasattr(policy, "require_resume"), "Missing exact consumer-side resume gate")
+        meta = {"schema": 1, "identity": "a" * 64, "progress": 10, "sha256": "b" * 64}
+        policy.require_resume(2, "key1", "key1", "a" * 64, 10, meta)
+        policy.require_resume(1, "", "", "", 0, None)
+        for actual_key, actual_meta in [
+                ("", None), ("older-key", meta),
+                ("key1", {**meta, "progress": 9}),
+                ("key1", {**meta, "identity": "c" * 64})]:
+            with self.subTest(key=actual_key, meta=actual_meta), self.assertRaises(ValueError):
+                policy.require_resume(2, "key1", actual_key, "a" * 64, 10, actual_meta)
+
 
 if __name__ == "__main__":
     unittest.main()

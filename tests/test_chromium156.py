@@ -85,6 +85,23 @@ class Chromium156Tests(unittest.TestCase):
             self.assertEqual((Path(directory) / "ui/views/menu.cc").read_bytes(),
                              b"// official mirror fixture\n")
 
+    def test_packaging_overlay_produces_one_glass_startup_class(self):
+        import tempfile
+        recipe = upstream.render(self.fixture(), "8ec86828d5fad19ff66ec7fcaebfe223c9252838",
+                                 "156.0.8078.73", "a" * 64, "b" * 64)
+        marker = 'install -Dvm644 /dev/stdin "$pkgdir/etc/chromium-flags.conf"'
+        overlay = recipe.split(marker, 1)[1].split("\nEOF\n", 1)[1]
+        overlay = overlay.split("\n\n  # Fill in common", 1)[0]
+        for current in ("StartupWMClass=chromium\n", "", "StartupWMClass=chromium\nStartupWMClass=old\n"):
+            with self.subTest(current=current), tempfile.TemporaryDirectory() as directory:
+                desktop = Path(directory) / "usr/share/applications/chromium.desktop"
+                desktop.parent.mkdir(parents=True)
+                desktop.write_text("[Desktop Entry]\nName=Chromium\nStartupNotify=true\n" + current)
+                subprocess.run(["bash", "-e", "-c", overlay],
+                               env={**os.environ, "pkgdir": directory}, check=True)
+                classes = [line for line in desktop.read_text().splitlines() if line.startswith("StartupWMClass=")]
+                self.assertEqual(classes, ["StartupWMClass=chromium-glass"])
+
 
 if __name__ == "__main__":
     unittest.main()

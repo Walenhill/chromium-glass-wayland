@@ -21,3 +21,6 @@ Task 2: complete — run 40778207204 verified official 156.0.8078.73 archive SHA
 Task 2: hardlinks regression RED 40776083166 -> GREEN unit suite 40777108339; mirrored source fetch RED 40778036397 -> GREEN 40778213237. All 40 tests pass.
 Ruling: Preserve both upstream menu-layer names using balanced two-line context, rather than changing the layer's name or Glass behavior. Cost: strict application and regression checks remain required for future ports.
 Task 3: in progress — independent whole-branch review and final remote verification pending; full Chromium compile not yet started.
+
+Final review: fresh reviewer examined e71b68c..73dbbcd. Important: timeout could hide a previously logged Ninja failure; continuation did not require the exact cache at the consumer. Minor regraded Important: duplicate StartupWMClass can break real launcher/window association. All three enter the single RED/GREEN fix pass.
+Final: Ruling: Regrade duplicate desktop keys as Important — a reasonable user expects correct launcher association, not conflicting keys. Cost if left: platform-dependent wrong grouping/launch association.
