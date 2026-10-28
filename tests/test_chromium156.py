@@ -15,8 +15,11 @@ class Chromium156Tests(unittest.TestCase):
         return (Path(__file__).parent / "fixtures/arch-156.PKGBUILD").read_text()
 
     def test_reviewed_156_recipe_is_valid_and_uses_bundled_tools(self):
-        result = upstream.render(self.fixture(), "8ec86828d5fad19ff66ec7fcaebfe223c9252838",
-                                 "156.0.8078.73", "a" * 64, "b" * 64)
+        try:
+            result = upstream.render(self.fixture(), "8ec86828d5fad19ff66ec7fcaebfe223c9252838",
+                                     "156.0.8078.73", "a" * 64, "b" * 64)
+        except ValueError as error:
+            self.fail("Reviewed Chromium 156 recipe was rejected: " + str(error))
         subprocess.run(["bash", "-n"], input=result, text=True, check=True)
         inspect = result + '\nprintf "%s|%s|%s|%s" "$pkgname" "$pkgver" "$_system_clang" "$_manual_clone"\n'
         values = subprocess.check_output(["bash"], input=inspect, text=True)

@@ -11,3 +11,6 @@ Task 1: core RED confirmed in run 40772179454 (15 missing-policy failures); GREE
 Ruling: A pinned container digest and Arch snapshot 2026/10/28 freeze dependency inputs across slices; actual pacman inventory additionally binds checkpoint identity. Cost: snapshot refresh needs a new identity/rebuild.
 
 Task 1: cross-run probe 40773639917/40773760134 exposed a changing cache key caused by generated __pycache__ files. Regression run 40774135230 confirms two RED tests for stable key inputs and exact remote cache visibility.
+
+Task 1: complete — GREEN run 40774390681 (34 tests); cross-run probe 40774381220 -> 40774478915 restored progress 2 -> 3 without rebuilding the first output. Exact remote cache visibility gate passed; no Chromium compilation was used for this probe.
+Task 2: RED run 40774787950 exposed the milestone guard and missing remote-only preparation guard.
