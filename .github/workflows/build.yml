@@ -8,16 +8,28 @@ on:
   workflow_dispatch:
     inputs:
       compile:
-        description: 'Run the full Chromium build (may take several hours)'
+        description: 'Run a bounded Chromium build slice'
         type: boolean
         default: false
-      runner:
-        description: 'Runner label (ubuntu-latest or a configured build runner)'
+      probe:
+        description: 'Test checkpoint/restore across two short GitHub runs (no Chromium)'
+        type: boolean
+        default: false
+      attempt:
+        description: 'Continuation slice, 1..6'
+        type: number
+        default: 1
+      expected_sha:
+        description: 'Pinned source SHA for automatic continuations'
         type: string
-        default: ubuntu-latest
+        default: ''
 
 permissions:
   contents: read
+
+env:
+  ARCH_SNAPSHOT: '2026/10/28'
+  ARCH_IMAGE: 'archlinux:base-devel@sha256:624bdc7fc6615155d67bc34cf7146c0c9fd0e3c92943977da63a630e4ca49c30'
 
 concurrency:
   group: glass-build-${{ github.ref }}
@@ -25,16 +37,28 @@ concurrency:
 
 jobs:
   compatibility:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Check expected revision
+        env:
+          EXPECTED: ${{ inputs.expected_sha }}
+        run: test -z "$EXPECTED" || test "$EXPECTED" = "$GITHUB_SHA"
+      - name: Ensure tiny integration-test tools exist
+        run: |
+          if ! command -v ninja >/dev/null || ! command -v zstd >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends ninja-build zstd
+          fi
       - name: Validate recipe and complete Glass integration
         run: |
           bash -n PKGBUILD tools/build_in_container.sh tools/install_updater.sh
           python3 -m unittest discover -s tests -v
           python3 tools/check_compatibility.py "$(python3 -c 'import json; print(json.load(open("upstream.json"))["version"])')" --report compatibility.json
           python3 tools/validate_metadata.py
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: compatibility-report
@@ -42,58 +66,121 @@ jobs:
 
   build:
     needs: compatibility
-    if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.compile)
-    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && (inputs.compile || inputs.probe))
+    runs-on: ubuntu-24.04
     timeout-minutes: 360
     permissions:
       contents: read
       id-token: write
       attestations: write
+    outputs:
+      state: ${{ steps.result.outputs.state }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - name: Check build resources
+        if: '!inputs.probe'
         run: |
           df -h .
           free -h
-          test "$(df -Pk . | awk 'NR==2 {print $4}')" -ge 83886080 || { echo 'Need at least 80 GiB free for a full build'; exit 1; }
-      - name: Add dedicated swap on hosted runner
-        if: (inputs.runner || 'ubuntu-latest') == 'ubuntu-latest'
+          test "$(df -Pk . | awk 'NR==2 {print $4}')" -ge 83886080 || { echo 'Need 80 GiB free'; exit 1; }
+      - name: Add dedicated swap
+        if: '!inputs.probe'
         run: |
-          sudo fallocate -l 12G /mnt/chromium-glass.swap
-          sudo chmod 600 /mnt/chromium-glass.swap
-          sudo mkswap /mnt/chromium-glass.swap
-          sudo swapon /mnt/chromium-glass.swap
-      - uses: actions/cache@v4
+          swap_path="/mnt/chromium-glass-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.swap"
+          sudo fallocate -l 12G "$swap_path"
+          sudo chmod 600 "$swap_path"
+          sudo mkswap "$swap_path"
+          sudo swapon "$swap_path"
+      - name: Restore a compatible checkpoint
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
-          path: .sccache
-          key: sccache-${{ runner.os }}-${{ hashFiles('PKGBUILD') }}-${{ github.run_id }}
+          path: .checkpoint
+          key: ${{ inputs.probe && 'probe' || 'ninja' }}-${{ hashFiles('PKGBUILD', 'upstream.json', 'chromium-glass-wayland.patch', 'tools/**') }}-${{ env.ARCH_SNAPSHOT }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
-            sccache-${{ runner.os }}-${{ hashFiles('PKGBUILD') }}-
-            sccache-${{ runner.os }}-
-      - name: Build and smoke-test in clean Arch container
+            ${{ inputs.probe && 'probe' || 'ninja' }}-${{ hashFiles('PKGBUILD', 'upstream.json', 'chromium-glass-wayland.patch', 'tools/**') }}-${{ env.ARCH_SNAPSHOT }}-
+      - name: Build one bounded slice
+        id: slice
+        env:
+          PROBE: ${{ inputs.probe || false }}
+          ATTEMPT: ${{ inputs.attempt || 1 }}
         run: |
-          mkdir -p .sccache artifacts
-          docker run --rm \
-            -e GLASS_BUILD_JOBS=2 \
-            -e SCCACHE_DIR=/build/.sccache \
-            -e SCCACHE_CACHE_SIZE=5G \
-            -v "${GITHUB_WORKSPACE}:/build" -w /build \
-            archlinux:base-devel bash tools/build_in_container.sh
-      - name: Attest the compiled candidate
+          mkdir -p artifacts .checkpoint
+          if [[ "$PROBE" == true ]]; then
+            python3 tools/probe_checkpoint.py --attempt "$ATTEMPT"
+          else
+            docker run --rm -e GITHUB_ACTIONS=true \
+              -e GLASS_HOST_UID="$(id -u)" -e GLASS_ARCH_SNAPSHOT="$ARCH_SNAPSHOT" \
+              -e GLASS_BUILD_ATTEMPT="$ATTEMPT" -e GLASS_BUILD_SECONDS=16200 -e GLASS_BUILD_JOBS=4 \
+              -v "${GITHUB_WORKSPACE}:/build" -w /build "$ARCH_IMAGE" bash tools/build_in_container.sh
+          fi
+      - name: Collect explicit slice state
+        id: result
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib
+          path = pathlib.Path('artifacts/build-state.json')
+          state = json.loads(path.read_text()) if path.is_file() else {'state': 'failed'}
+          if state['state'] == 'checkpoint':
+              checkpoint = json.loads(pathlib.Path('.checkpoint/manifest.json').read_text())
+              if not state.get('checkpoint_saved') or checkpoint['progress'] != state['progress'] or checkpoint['identity'] != state['identity']:
+                  raise ValueError('Checkpoint was not durably prepared; refusing continuation')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('state=' + state['state'] + '\n')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write('Slice state (not binary approval):\n\n' + json.dumps(state, indent=2) + '\n')
+          PY
+      - name: Save checkpoint before hosted-job timeout
+        id: save
+        if: always() && steps.slice.outcome == 'success' && steps.result.outputs.state == 'checkpoint'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .checkpoint
+          key: ${{ inputs.probe && 'probe' || 'ninja' }}-${{ hashFiles('PKGBUILD', 'upstream.json', 'chromium-glass-wayland.patch', 'tools/**') }}-${{ env.ARCH_SNAPSHOT }}-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Attest only a complete compiled candidate
+        if: steps.result.outputs.state == 'complete' && !inputs.probe
         id: attest
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
         with:
           subject-path: '${{ github.workspace }}/*.pkg.tar.zst'
       - name: Save offline build attestation
+        if: steps.result.outputs.state == 'complete' && !inputs.probe
         env:
           BUNDLE: ${{ steps.attest.outputs.bundle-path }}
         run: cp "$BUNDLE" artifacts/build-attestation.json
-      - name: Upload candidate package and build evidence
+      - name: Upload evidence (checkpoint alone is not a package)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: chromium-glass-candidate
+          name: ${{ inputs.probe && 'checkpoint-probe' || 'chromium-glass-candidate' }}
           path: |
             *.pkg.tar.zst
             artifacts/*
           retention-days: 14
+
+  continue:
+    needs: build
+    if: needs.build.result == 'success' && needs.build.outputs.state == 'checkpoint' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Queue next bounded slice at the same source revision
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ATTEMPT: ${{ inputs.attempt || 1 }}
+          PROBE: ${{ inputs.probe || false }}
+        run: |
+          test "$ATTEMPT" -lt 6
+          current=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$GITHUB_REF_NAME" --jq .object.sha)
+          if [[ "$current" != "$GITHUB_SHA" ]]; then
+            echo 'Branch changed; refusing to continue stale source.'
+            exit 1
+          fi
+          next=$((ATTEMPT + 1))
+          gh workflow run build.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" \
+            -f compile="$([[ "$PROBE" == true ]] && echo false || echo true)" \
+            -f probe="$PROBE" -f attempt="$next" -f expected_sha="$GITHUB_SHA"

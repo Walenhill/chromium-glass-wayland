@@ -6,3 +6,6 @@ Ruling: Execute natively without further design questions — the user selected 
 Ruling: Remote branch/API replaces local worktree, scratch scripts and on-host test runs — explicit no-PC constraint takes precedence over local skill bookkeeping helpers. Cost: remote CI latency and API commits.
 Ruling: Save complete Ninja outputs rather than rely solely on a bounded compiler cache — prevents cache eviction from resetting progress. Cost: checkpoint size is limited to 8 GiB; exceeding it is an explicit failure, not permission to buy storage.
 Pre-flight: Task 1 produces state/identity consumed by Task 2's driver and Task 3's publication gate; only state complete may attest/publish. Source hash + package inventory bind restored outputs.
+
+Task 1: core RED confirmed in run 40772179454 (15 missing-policy failures); GREEN confirmed in run 40772617231 (32 tests, including real Ninja resume).
+Ruling: A pinned container digest and Arch snapshot 2026/10/28 freeze dependency inputs across slices; actual pacman inventory additionally binds checkpoint identity. Cost: snapshot refresh needs a new identity/rebuild.
