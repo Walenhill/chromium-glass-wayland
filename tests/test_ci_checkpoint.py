@@ -143,6 +143,33 @@ class CheckpointTests(unittest.TestCase):
         self.assertEqual(result, 7)
         self.assertFalse(expired)
 
+    def test_workflow_key_ignores_generated_python_files(self):
+        root = self.root / "repo"
+        root.mkdir()
+        for name in ("PKGBUILD", "upstream.json", "chromium-glass-wayland.patch"):
+            (root / name).write_text("input")
+        (root / "tools").mkdir()
+        driver = root / "tools/build_in_container.sh"
+        driver.write_text("real build input")
+        self.assertTrue(hasattr(policy, "input_fingerprint"), "Missing stable input fingerprint")
+        first = policy.input_fingerprint(root, "", 1)
+        (root / "tools/__pycache__").mkdir()
+        (root / "tools/__pycache__/ci_checkpoint.pyc").write_bytes(b"generated")
+        self.assertEqual(policy.input_fingerprint(root, "", 1), first)
+        driver.write_text("changed compiler input")
+        self.assertNotEqual(policy.input_fingerprint(root, "", 1), first)
+
+    def test_continuation_requires_a_visible_exact_branch_cache(self):
+        self.assertTrue(hasattr(policy, "uploaded_checkpoint"), "Missing remote cache existence gate")
+        entry = {"id": 1, "ref": "refs/heads/candidate", "key": "expected", "version": "v1",
+                 "size_in_bytes": 100, "created_at": "2026-10-29T00:00:00Z",
+                 "last_accessed_at": "2026-10-29T00:00:00Z"}
+        payload = {"total_count": 1, "actions_caches": [entry]}
+        self.assertTrue(policy.uploaded_checkpoint(payload, "expected", "refs/heads/candidate"))
+        self.assertFalse(policy.uploaded_checkpoint(payload, "other", "refs/heads/candidate"))
+        self.assertFalse(policy.uploaded_checkpoint(payload, "expected", "refs/heads/other"))
+        self.assertFalse(policy.uploaded_checkpoint({"actions_caches": []}, "expected", "refs/heads/candidate"))
+
 
 if __name__ == "__main__":
     unittest.main()
