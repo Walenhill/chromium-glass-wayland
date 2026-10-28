@@ -63,6 +63,28 @@ class Chromium156Tests(unittest.TestCase):
                 self.assertIn("::features::IsGlassFrameEnabled()", source.read_text())
                 self.assertIn(f'SetName("{name}")', source.read_text())
 
+    def test_source_fetch_uses_official_mirror_after_gitiles_timeout(self):
+        import io
+        import tempfile
+        import urllib.error
+        import check_compatibility as compatibility
+        def download(url, timeout=0):
+            url = getattr(url, "full_url", url)
+            if url.startswith("https://chromium.googlesource.com/"):
+                raise urllib.error.HTTPError(url, 504, "Gateway Timeout", {}, None)
+            if url == "https://raw.githubusercontent.com/chromium/chromium/156.0.8078.73/ui/views/menu.cc":
+                return io.BytesIO(b"// official mirror fixture\n")
+            raise AssertionError("Unexpected download origin: " + url)
+        with tempfile.TemporaryDirectory() as directory, \
+                patch.object(compatibility.urllib.request, "urlopen", side_effect=download), \
+                patch.object(compatibility.time, "sleep"):
+            try:
+                compatibility.fetch("ui/views/menu.cc", "156.0.8078.73", Path(directory))
+            except Exception as error:
+                self.fail("A temporary primary outage must use the official mirror: " + str(error))
+            self.assertEqual((Path(directory) / "ui/views/menu.cc").read_bytes(),
+                             b"// official mirror fixture\n")
+
 
 if __name__ == "__main__":
     unittest.main()
