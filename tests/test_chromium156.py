@@ -36,6 +36,33 @@ class Chromium156Tests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 upstream.require_ci()
 
+    def test_menu_constructor_hunk_preserves_both_upstream_layer_names(self):
+        import re
+        import tempfile
+        patch_text = (Path(__file__).resolve().parents[1] / "chromium-glass-wayland.patch").read_text()
+        section = patch_text.split("--- a/ui/views/controls/menu/menu_scroll_view_container.cc\n", 1)[1]
+        hunk = next(m.group(0) for m in re.finditer(r"(?ms)^@@.*?(?=^@@|\Z)", section)
+                    if "AddChildView(std::make_unique<View>())" in m.group(0))
+        for name in ("MenuScrollViewContainer/background", "MenuScrollViewContainer:Background"):
+            with self.subTest(layer=name), tempfile.TemporaryDirectory() as directory:
+                source = Path(directory) / "menu.cc"
+                source.write_text("// padding\n" * 246 +
+                    "                                    ->use_ash_system_ui_layout()) {\n"
+                    "  SetUseDefaultFillLayout(true);\n"
+                    "  background_view_ = AddChildView(std::make_unique<View>());\n"
+                    "  if (use_ash_system_ui_layout_) {\n"
+                    "    // Enable background blur for ChromeOS system context menu.\n"
+                    "    background_view_->SetPaintToLayer();\n"
+                    "    auto* background_layer = background_view_->layer();\n"
+                    f'    background_layer->SetName("{name}");\n'
+                    "    if (ShouldApplyBackgroundBlur()) {}\n  }\n}\n")
+                result = subprocess.run(["patch", "--batch", "--fuzz=0", "-p1"],
+                    input="--- a/menu.cc\n+++ b/menu.cc\n" + hunk, cwd=directory,
+                    text=True, capture_output=True)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("::features::IsGlassFrameEnabled()", source.read_text())
+                self.assertIn(f'SetName("{name}")', source.read_text())
+
 
 if __name__ == "__main__":
     unittest.main()
