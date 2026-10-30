@@ -310,3 +310,37 @@
      // The bubble border only draws the shadow, while the background view draws
      // the visible border, so the insets must be inside the background view's
      // content, not outside the background view.
+--- a/chrome/browser/ui/views/omnibox/rounded_omnibox_results_frame.cc
++++ b/chrome/browser/ui/views/omnibox/rounded_omnibox_results_frame.cc
+@@ -22,6 +22,7 @@
+ #include "ui/base/cursor/cursor.h"
+ #include "ui/base/metadata/metadata_header_macros.h"
+ #include "ui/base/metadata/metadata_impl_macros.h"
++#include "ui/base/ui_base_features.h"
+ #include "ui/base/pointer/touch_ui_controller.h"
+ #include "ui/compositor/layer.h"
+ #include "ui/gfx/geometry/rounded_corners_f.h"
+@@ -279,6 +280,23 @@
+   auto contents_host = std::move(contents_host_builder).Build();
+   contents_host->AddChildViewRaw(contents_.get());
+ 
++#if BUILDFLAG(IS_LINUX)
++  if (features::IsGlassFrameEnabled() && webui_content &&
++      !draw_shadow_in_webui_) {
++    // The WebUI presenter uses an Aura child, not the legacy native popup.
++    // Blur its results layer inside Chromium. Existing layout confines this
++    // layer below the location-bar cutout, leaving the input and icons sharp.
++    // Keep WebUI-owned shadows and the legacy native popup unchanged.
++    contents_->SetPaintToLayer();
++    contents_->layer()->SetFillsBoundsOpaquely(false);
++    contents_->layer()->SetBackgroundBlur(18.0f);
++    contents_->layer()->SetBackdropFilterQuality(0.5f);
++    contents_->layer()->SetRoundedCornerRadius(
++        gfx::RoundedCornersF(0, 0, corner_radius, corner_radius));
++    contents_->layer()->SetIsFastRoundedCorner(true);
++  }
++#endif
++
+   if (!draw_shadow_in_webui_) {
+     SetElevation(kDefaultElevation);
+   }
