@@ -37,6 +37,7 @@ class OmniboxBlurTests(unittest.TestCase):
             harness = r"""
 #include <cassert>
 #include <memory>
+#include <initializer_list>
 #define BUILDFLAG(x) (x)
 #ifndef IS_LINUX
 #define IS_LINUX 1
