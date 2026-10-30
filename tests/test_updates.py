@@ -156,7 +156,7 @@ class UpdaterFlowTests(unittest.TestCase):
 class SourceTests(unittest.TestCase):
     def test_complete_patch(self):
         root = Path(__file__).resolve().parents[1]
-        self.assertEqual(compatibility.validate_patch((root / "chromium-glass-wayland.patch").read_text()), 19)
+        self.assertEqual(compatibility.validate_patch((root / "chromium-glass-wayland.patch").read_text()), 21)
 
     def test_reject_truncated_hunk(self):
         with self.assertRaises(ValueError):
