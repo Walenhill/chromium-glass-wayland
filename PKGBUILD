@@ -1,5 +1,6 @@
 # Maintainer: Christian Heusel <gromit@archlinux.org>
 # Maintainer: Jonathan Grotelüschen <tippfehlr@archlinux.org>
+# Maintainer: DeepChirp <deepchirp@archlinux.org>
 # Contributor: Evangelos Foutras <foutrelis@archlinux.org>
 # Contributor: Pierre Schmitz <pierre@archlinux.de>
 # Contributor: Jan "heftig" Steffens <jan.steffens@gmail.com>
@@ -7,19 +8,20 @@
 # Contributor: Caleb Maclennan <caleb@alerque.com>
 
 pkgname=chromium-glass
-pkgver=151.0.7922.108
-pkgrel=1
+pkgver=156.0.8078.73
+pkgrel=2
 _launcher_ver=8
-_arch_pkg_tag=151.0.7922.108-1
-_arch_pkg_base="https://gitlab.archlinux.org/archlinux/packaging/packages/chromium/-/raw/$_arch_pkg_tag"
+_arch_pkg_commit=8ec86828d5fad19ff66ec7fcaebfe223c9252838
+_arch_pkg_base="https://gitlab.archlinux.org/archlinux/packaging/packages/chromium/-/raw/$_arch_pkg_commit"
 _manual_clone=0
-_system_clang=1
+_system_clang=0
 pkgdesc="Chromium with native translucent browser chrome for Wayland compositors"
 arch=('x86_64')
 url="https://www.chromium.org/Home"
 license=('BSD-3-Clause')
 provides=("chromium=$pkgver")
 conflicts=('chromium')
+backup=('etc/chromium-flags.conf')
 depends=(
   'alsa-lib'
   'at-spi2-core'
@@ -61,6 +63,7 @@ depends=(
 makedepends=(
   'clang'
   'compiler-rt'
+
   'git'
   'gn'
   'go'
@@ -69,11 +72,14 @@ makedepends=(
   'lld'
   'ninja'
   'nodejs'
+  'opus'
   'pipewire'
   'python'
   'qt6-base'
-  'rust-bindgen'
   'rust'
+  'rust-bindgen'
+  'typescript'
+  'vulkan-headers'
 )
 optdepends=('pipewire: WebRTC desktop sharing under Wayland'
             'kdialog: support for native dialogs in Plasma'
@@ -86,38 +92,50 @@ source=(https://commondatastorage.googleapis.com/chromium-browser-official/chrom
         https://github.com/foutrelis/chromium-launcher/archive/v$_launcher_ver/chromium-launcher-$_launcher_ver.tar.gz
         $_arch_pkg_base/chromium-138-nodejs-version-check.patch
         $_arch_pkg_base/chromium-145-fix-SYS_SECCOMP.patch
-        $_arch_pkg_base/chromium-147-revert-clang-no-lifetime-dse-flag.patch
         $_arch_pkg_base/chromium-147-rust-1.95-bytemuck.patch
-        $_arch_pkg_base/chromium-149-drop-unknown-clang-flag.patch
-        $_arch_pkg_base/chromium-149-unbundle-minizip-undo-unicode.patch
+        $_arch_pkg_base/chromium-147-simdutf-8.0-base-char.patch
         $_arch_pkg_base/chromium-149-use-of-undeclared-identifier-ERROR.patch
-        $_arch_pkg_base/chromium-149-build-with-wasm-rollup.patch
         $_arch_pkg_base/chromium-150-revert-avx-flag-change.patch
-        $_arch_pkg_base/chromium-151-dont-depends-on-histograms.xml-if-it-is-not-git-checkout.patch
+        $_arch_pkg_base/chromium-152-unbundle-minizip-undo-unicode.patch
+        $_arch_pkg_base/chromium-152-unbundle-opus-devtools.patch
+        $_arch_pkg_base/chromium-153-hermetic-python.patch
+        $_arch_pkg_base/chromium-153-iamf-tools-unbundled-opus.patch
+        $_arch_pkg_base/chromium-155-use-system-esbuild.patch
+        $_arch_pkg_base/chromium-156-crubit.patch
+        $_arch_pkg_base/chromium-156-remove-private_verification_tokens.patch
+        $_arch_pkg_base/chromium-156-revert-gn-check-includes.patch
+        $_arch_pkg_base/chromium-156-typescript.patch
+        $_arch_pkg_base/chromium-156-isolatedDeclarations.patch
         $_arch_pkg_base/compiler-rt-adjust-paths.patch
         $_arch_pkg_base/increase-fortify-level.patch
         $_arch_pkg_base/enable-widevine-arm64.patch
         $_arch_pkg_base/use-oauth2-client-switches-as-default.patch
         $_arch_pkg_base/glibc-2.42-baud-rate-fix.patch
         chromium-glass-wayland.patch)
-sha256sums=('3f13338d12db5c6e17464b3be28eca2a07d64c7c58634268fa76924e3c5243aa'
+sha256sums=('cfdf8def1207b81af1231e5170bf849896cd353e72220ca05d93432e31551d59'
             '213e50f48b67feb4441078d50b0fd431df34323be15be97c55302d3fdac4483a'
             '11a96ffa21448ec4c63dd5c8d6795a1998d8e5cd5a689d91aea4d2bdd13fb06e'
             '4fc040a0656a0a524dd8ad090cd129fc5b6cb21adcc66be82080165789e8c13e'
-            'c382830318c5b37826ecf44f3ba9def6be8affdad1bce819ecb83f3222ff4b3a'
             'b9e6339221efe03540ffb360c161d93604a1fc93a5a1c53e5e9849066f987d05'
-            'e25cf8fb60f5958127053c515b8decc2b45acceebf9a57654066d093df11f8e9'
-            'c22338d13f12772cdbcb5cfc1ace94438b9f9c72353cdb165a3ff3ef3d677c78'
+            '80e445d7a5cbd61d1252ecf46c5eaf0fb4a5e63bd1b9c976261df778a4586640'
             '951514535be65f0e2f84e82305d96292be1da353c1427ba1048ea24be70003c4'
-            'c4df27d25d298ac95d85e6f06b558b73bb67de5110a19a0228cb7f8519291ea5'
             '5f6ccb7b945c8a13c690493723bad816b36f2f25792d47e677b56f8200907e60'
-            '552ddcef0cf139927f54c9c728c68b0e385600107e5166449b29de75e5dfcd7f'
+            '890e5d98088ef1c7c075a551442f03385d1db266cad8a65576704a22720683f9'
+            '3276453f2ce655b6286476f48d4df837be952d9447afa46583f79ec71f2288c3'
+            'ebf74154266d0b6d6cc957c413f845052c5fcfce7745befb8821595cdf3f7d49'
+            '2ab9fbe653829ce692f83ee780aad07e8c83a6686e51ab9459ad736cfa2850ee'
+            'ded2abcb912ac4b6ad139e56384eea8f3b470cf57ecb0baa2c2d042df7575a23'
+            '0c8bd7769496ab71116cd73ac17c096b0979fa70fb2e76676f76d34c7424449e'
+            '8170368b531a0ae70071da054db4a09a6902b8b7854083d5505570f86a73e644'
+            'c666f9b009d3a2c737501d714689677e6d474982695966651fe7cdbcbc6e5815'
+            '946d4f70daeb446b911197bca804983d305c0ee809bc5507d05451bd07fe9523'
+            'f6aefbd3f70dbda9242cf815a1dca56af729632166bc57e5067755b119cc95de'
             'ec8e49b7114e2fa2d359155c9ef722ff1ba5fe2c518fa48e30863d71d3b82863'
             'd634d2ce1fc63da7ac41f432b1e84c59b7cceabf19d510848a7cff40c8025342'
-            '33d1650e183a86cc2d0e9b0fcc08a5da76c7354d25a419921e9d2dc02b8b3854'
+            '5ee4bb69379ac0cea7946c9f8f4ca9e20e0a9e4ee2ee9121eb0ebbb94dd7e928'
             '9343afa1a4308a7cfb3317229f5aff7778688debcc03c4a74a85908aa1d0cc3a'
             '1c1898f263eaacbc069a8e1a3e732852350350d1dad4cb1a6bba430e3b796cd0'
-            '0275c278a8d2be58fbed1460568d0f5dada46ad7ed4112b7631572f2f7610799')
+            '8280cab6b06d956a141690f474bb2b14302f2cd2cd39dc43df575003e9e4a3e6')
 
 if (( _manual_clone )); then
   source[0]=fetch-chromium-release
@@ -130,11 +148,13 @@ fi
 declare -gA _system_libs=(
   [brotli]=brotli
   [dav1d]=dav1d
+  [double-conversion]=double-conversion
   #[ffmpeg]=ffmpeg    # YouTube playback stopped working in Chromium 120
   [flac]=flac
   [fontconfig]=fontconfig
   [freetype]=freetype2
   [harfbuzz]=harfbuzz
+  [highway]=highway
   #[icu]=icu
   #[jsoncpp]=jsoncpp  # needs libstdc++
   #[libaom]=aom
@@ -149,6 +169,7 @@ declare -gA _system_libs=(
   [openh264]=openh264
   [opus]=opus
   #[re2]=re2          # needs libstdc++
+  [simdutf]=simdutf
   #[snappy]=snappy    # needs libstdc++
   #[woff2]=woff2      # needs libstdc++
   [zlib]=minizip
@@ -175,9 +196,10 @@ prepare() {
   fi
   cd chromium-$pkgver
 
-  # Enable Chromium's existing translucent GlassFrame surface on Linux and
-  # give the browser chrome semi-transparent colors for compositor blur.
-  patch -Np1 -i ../chromium-glass-wayland.patch
+  # Apply every Glass hunk strictly; reject context drift.
+  patch --batch --fuzz=0 -Np1 -i ../chromium-glass-wayland.patch
+
+  python3 "$startdir/tools/fetch_esbuild.py" "$PWD"
 
   # Allow building against system libraries in official builds
   sed -i 's/OFFICIAL_BUILD/GOOGLE_CHROME_BUILD/' \
@@ -201,28 +223,13 @@ prepare() {
   patch -Np1 -i ../chromium-138-nodejs-version-check.patch
 
   # Allow libclang_rt.builtins from compiler-rt >= 16 to be used
-  patch -Np1 -i ../compiler-rt-adjust-paths.patch
 
   # Increase _FORTIFY_SOURCE level to match Arch's default flags
   patch -Np1 -i ../increase-fortify-level.patch
 
-  # clang 22 lacks -fsanitize-ignore-for-ubsan-feature, which is needed to use
-  # -fsanitize=array-bounds without triggering UBSan feature detection. Without
-  # feature detection suppression, V8 compiles in __sanitizer_set_death_callback
-  # calls that require the UBSan runtime, which is not linked in a trap-mode
-  # build. Drop the entire sanitize_c_array_bounds cflags block.
-  # Can be dropped when arch has LLVM 23.
-  patch -Np1 -i ../chromium-149-drop-unknown-clang-flag.patch
-
-  # Causes a build failure with our clang version
-  patch -Np1 -i ../chromium-147-revert-clang-no-lifetime-dse-flag.patch
-
   # https://crbug.com/456218403
   patch -Np1 -i ../chromium-145-fix-SYS_SECCOMP.patch
 
-  patch -Np1 -i ../chromium-149-build-with-wasm-rollup.patch
-
-  patch -Np1 -i ../chromium-147-rust-1.95-bytemuck.patch
 
   # enable widevine for arm64
   patch -Np1 -i ../enable-widevine-arm64.patch
@@ -230,17 +237,39 @@ prepare() {
   # https://crbug.com/456677057
   patch -Np1 -i ../glibc-2.42-baud-rate-fix.patch
 
-  # Chromium bundles a patched minizip with extra features.
-  patch -Np1 -i ../chromium-149-unbundle-minizip-undo-unicode.patch
-
   patch -Np1 -i ../chromium-149-use-of-undeclared-identifier-ERROR.patch
 
   # Fix issue about missing AVX functions
   # Credit: https://github.com/ungoogled-software/ungoogled-chromium/pull/3837
   patch -Np1 -i ../chromium-150-revert-avx-flag-change.patch
 
-  # Credit: https://github.com/ungoogled-software/ungoogled-chromium/pull/3883
-  patch -Np1 -i ../chromium-151-dont-depends-on-histograms.xml-if-it-is-not-git-checkout.patch
+  # To unbundle simdutf
+  patch -Np1 -i ../chromium-147-simdutf-8.0-base-char.patch
+
+  patch -Np1 -i ../chromium-152-unbundle-minizip-undo-unicode.patch
+
+  patch -Np1 -i ../chromium-152-unbundle-opus-devtools.patch
+
+  # Use system python3 instead of the hermetic cpython3 interpreter
+  # https://github.com/ungoogled-software/ungoogled-chromium/pull/3946
+  patch -Np1 -i ../chromium-153-hermetic-python.patch
+
+  # third_party/iamf_tools includes vendored Opus via relative "include/opus.h"
+  # paths that only resolve against a real bundled Opus checkout; fix them up
+  # for the unbundled system Opus build
+  patch -Np1 -i ../chromium-153-iamf-tools-unbundled-opus.patch
+
+
+
+  patch -Np1 -i ../chromium-156-remove-private_verification_tokens.patch
+
+
+  patch -Np1 -i ../chromium-156-isolatedDeclarations.patch
+
+  # Work around TypeScript becoming a build dependency: disable tsgo for the
+  # WebUI and point devtools at the system tsc binary
+  # https://github.com/ungoogled-software/ungoogled-chromium/pull/3966
+  patch -Np1 -i ../chromium-156-typescript.patch
 
   # Link to system tools required by the build
   mkdir -p third_party/node/linux/node-linux-x64/bin \
@@ -259,6 +288,9 @@ prepare() {
   rm -f third_party/gperf/cipd/bin/gperf
   ln -s /usr/bin/gperf third_party/gperf/cipd/bin/
 
+
+
+
   if (( !_system_clang )); then
     # Use prebuilt rust as system rust cannot be used due to the error:
     #   error: the option `Z` is only accepted on the nightly compiler
@@ -266,6 +298,7 @@ prepare() {
 
     # To link to rust libraries we need to compile with prebuilt clang
     ./tools/clang/scripts/update.py
+    python3 tools/update_pgo_profiles.py --target=linux update --gs-url-base=chromium-optimization-profiles/pgo_profiles
   fi
 
   # Remove bundled libraries for which we will use the system copies; this
@@ -273,9 +306,16 @@ prepare() {
   # added benefit of not having to list all the remaining libraries
   local _lib
   for _lib in ${_unwanted_bundled_libs[@]}; do
-    find "third_party/$_lib" -type f \
-      \! -path "third_party/$_lib/chromium/*" \
-      \! -path "third_party/$_lib/google/*" \
+    # Most bundled libraries live under `third_party/<lib>`, but
+    # `double-conversion` is located under `base/third_party/double_conversion`
+    local _dir="third_party/$_lib"
+    if [[ ! -d "${_dir}" ]]; then
+      _dir="base/third_party/${_lib//-/_}"
+    fi
+
+    find "$_dir" -type f \
+      \! -path "$_dir/chromium/*" \
+      \! -path "$_dir/google/*" \
       \! -path "third_party/harfbuzz-ng/utils/hb_scoped.h" \
       \! -regex '.*\.\(gn\|gni\|isolate\)' \
       -delete
@@ -342,12 +382,15 @@ build() {
   if (( _system_clang )); then
      local _clang_version=$(
        clang --version | grep -m1 version | sed 's/.* \([0-9]\+\).*/\1/')
+     local _site_packages=$(python -c "import site; print(site.getsitepackages()[0])")
 
     _flags+=(
       'clang_base_path="/usr"'
       'clang_use_chrome_plugins=false'
       "clang_version=\"$_clang_version\""
       'chrome_pgo_phase=0' # needs newer clang to read the bundled PGO profile
+      'v8_metagen_libclang_so="/usr/lib/libclang.so"'
+      "v8_metagen_libclang_bindings_dir=\"$_site_packages\""
     )
 
     # Allow the use of nightly features with stable Rust compiler
@@ -397,8 +440,11 @@ build() {
     CXXFLAGS="${CXXFLAGS/-march=*([^ ]) }"
   fi
 
-  gn gen out/Release --args="${_flags[*]}"
-  ninja -C out/Release chrome chrome_sandbox chromedriver.unstripped
+  if command -v sccache >/dev/null; then
+    _flags+=('cc_wrapper="sccache"')
+  fi
+  buildtools/linux64/gn gen out/Release --args="${_flags[*]}"
+  ninja -j "${GLASS_BUILD_JOBS:-4}" -C out/Release chrome chrome_sandbox chromedriver.unstripped
 }
 
 package() {
@@ -420,21 +466,21 @@ package() {
   sed -i \
     -e 's/@@MENUNAME/Chromium/g' \
     -e 's/@@PACKAGE/chromium/g' \
-    -e 's/@@usr_bin_symlink_name/chromium/g' \
+    -e 's/@@desktop_exec/chromium/g' \
+    -e 's/@@desktop_icon/chromium/g' \
+    -e 's/@@startup_wm_class/chromium/g' \
     -e 's|@@uri_scheme|x-scheme-handler/chromium;|g' \
     -e 's/@@extra_desktop_entries//g' \
     "$pkgdir/usr/share/applications/chromium.desktop" \
     "$pkgdir/usr/share/man/man1/chromium.1"
 
-  # Make every packaged launch use the native Wayland glass surface and the
-  # stable app-id expected by the compositor blur rule.
   install -Dvm644 /dev/stdin "$pkgdir/etc/chromium-flags.conf" <<'EOF'
 --ozone-platform=wayland
 --enable-features=GlassFrame
 --class=chromium-glass
 EOF
-  sed -i \
-    -e 's/^Name=Chromium$/Name=Chromium Glass/' \
+  sed -i -e 's/^Name=Chromium$/Name=Chromium Glass/' \
+    -e '/^StartupWMClass=/d' \
     -e '/^StartupNotify=true$/a StartupWMClass=chromium-glass' \
     "$pkgdir/usr/share/applications/chromium.desktop"
 

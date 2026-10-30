@@ -1,0 +1,63 @@
+name: Check Chromium security updates
+
+on:
+  schedule:
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: chromium-upstream-check
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Linux Stable
+        id: upstream
+        run: |
+          python3 tools/update_upstream.py > update-status.json
+          cat update-status.json >> "$GITHUB_STEP_SUMMARY"
+          python3 - <<'PY'
+          import json, os
+          status = json.load(open('update-status.json'))
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f"needed={str(status['update_available']).lower()}\n")
+          PY
+      - name: Prepare and validate candidate recipe
+        if: steps.upstream.outputs.needed == 'true'
+        run: |
+          python3 tools/update_upstream.py --prepare
+          docker run --rm -v "${GITHUB_WORKSPACE}:/build" -w /build archlinux:base-devel \
+            bash -c 'useradd -m builder && chown -R builder:builder /build && su builder -c "makepkg --printsrcinfo > .SRCINFO"'
+          python3 tools/validate_metadata.py
+      - name: Open update pull request
+        id: candidate
+        if: steps.upstream.outputs.needed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: codex/auto-update
+          title: 'Update Chromium Glass to Linux Stable'
+          commit-message: 'Prepare Chromium Glass security update candidate'
+          body: |
+            Updates the recipe to official Linux Stable using pinned Arch packaging.
+            All Glass hunks and integration checks pass. Full compilation and a real
+            Wayland visual check are required before installation or publication.
+            This candidate has not been automatically installed or released.
+          add-paths: |
+            PKGBUILD
+            .SRCINFO
+            README.md
+            upstream.json
+      - name: Dispatch full candidate build
+        if: steps.candidate.outputs.pull-request-operation == 'created' || steps.candidate.outputs.pull-request-operation == 'updated'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run build.yml --ref codex/auto-update -f compile=true

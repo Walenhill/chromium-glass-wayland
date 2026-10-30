@@ -1,0 +1,10 @@
+{
+  "version": "156.0.8078.73",
+  "arch_recipe_version": "156.0.8078.73",
+  "arch_commit": "8ec86828d5fad19ff66ec7fcaebfe223c9252838",
+  "source_sha256": "cfdf8def1207b81af1231e5170bf849896cd353e72220ca05d93432e31551d59",
+  "glass_patch_sha256": "8280cab6b06d956a141690f474bb2b14302f2cd2cd39dc43df575003e9e4a3e6",
+  "source_date_epoch": 1793140778,
+  "arch_snapshot": "2026/10/28",
+  "status": "candidate; full build and visual validation required"
+}

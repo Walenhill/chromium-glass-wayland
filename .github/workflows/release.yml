@@ -1,0 +1,53 @@
+name: Approve tested Chromium Glass release
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_run:
+        description: 'Successful Build Chromium Glass run ID'
+        required: true
+        type: string
+      visual_approved:
+        description: 'I verified real Wayland blur, menus, popups and a second window'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  actions: read
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: chromium-glass-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main' && inputs.visual_approved
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify build identity and prepare approved manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RUN: ${{ inputs.build_run }}
+        run: python3 tools/promote_release.py "$BUILD_RUN"
+      - name: Attest the approval manifest from main
+        id: attest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: release/stable.json
+      - name: Publish verified stable channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          cp "$BUNDLE" release/release-attestation.json
+          tag=$(python3 -c 'import json; print(json.load(open("release/stable.json"))["tag"])')
+          gh release create "$tag" --target "$GITHUB_SHA" --title "Chromium Glass $tag" \
+            --notes-file release/notes.md --latest \
+            release/*.pkg.tar.zst release/stable.json release/*attestation.json

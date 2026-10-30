@@ -1,0 +1,17 @@
+[Unit]
+Description=Install approved Chromium Glass stable updates
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/lib/chromium-glass/stable_update.py --install
+Environment=PATH=/usr/bin:/bin
+Environment=GH_CONFIG_DIR=/var/lib/chromium-glass/gh
+StateDirectory=chromium-glass
+CacheDirectory=chromium-glass
+PrivateTmp=true
+ProtectHome=true
+UMask=0022
+Nice=10
+TimeoutStartSec=15min
